@@ -15,6 +15,8 @@
 namespace ldcp_sdk
 {
 
+const int MESSAGE_LENGTH_MAX = 65535;
+
 class NetworkTransport : public Transport
 {
 public:
@@ -186,7 +188,7 @@ rapidjson::Document NetworkTransport::parseIncomingMessage(size_t length)
   }
   else {
     try {
-      int expected_checksum = std::numeric_limits<int>::max();
+      int expected_checksum = -1;
       bool end_of_headers = false;
 
       while (true) {
@@ -195,20 +197,26 @@ rapidjson::Document NetworkTransport::parseIncomingMessage(size_t length)
         std::string character_sequence;
 
         istream >> character_count >> colon;
+        if (!istream.good() || character_count > MESSAGE_LENGTH_MAX || colon != ':')
+          throw std::runtime_error("");
+
         if (!end_of_headers) {
           character_sequence.resize(character_count);
           istream.read(&character_sequence[0], character_count);
           istream >> comma;
         }
         else {
+          if (!(asio::buffers_end(incoming_message_buffer_.data()) -
+                asio::buffers_begin(incoming_message_buffer_.data()) >= character_count + 1))
+            throw std::runtime_error("");
           auto iter = asio::buffers_begin(incoming_message_buffer_.data());
-          uint16_t actual_checksum = Utility::CalculateCRC16(iter, iter + character_count);
+          int actual_checksum = Utility::CalculateCRC16(iter, iter + character_count);
           if (actual_checksum != expected_checksum)
             throw std::runtime_error("");
           comma = *(iter + character_count);
         }
 
-        if (character_count == std::string::npos || !istream.good() || colon != ':' || comma != ',')
+        if (!istream.good() || comma != ',')
           throw std::runtime_error("");
 
         if (character_count == 0) {

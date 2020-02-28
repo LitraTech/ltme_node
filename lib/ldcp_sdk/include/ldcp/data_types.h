@@ -23,37 +23,6 @@ public:
   std::vector<BlockData> layers;
 };
 
-class Geometry
-{
-public:
-  virtual ~Geometry() = default;
-};
-
-class Polygon : public Geometry
-{
-public:
-  std::vector<std::pair<double, double>> vertices;
-};
-
-class Field
-{
-public:
-  Field() = default;
-
-  Field(Field&& other)
-  {
-    geometry.reset(other.geometry.release());
-  }
-
-  std::unique_ptr<Geometry> geometry;
-};
-
-class FieldSet
-{
-public:
-  std::vector<Field> fields;
-};
-
 }
 
 #endif

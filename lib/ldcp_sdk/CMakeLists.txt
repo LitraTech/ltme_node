@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.2)
 
 project(ldcp_sdk)
 
@@ -43,7 +43,11 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   if(BUILD_DEVICE_MANAGER)
     set(BONJOUR_SDK_DIR "C:/Program Files/Bonjour SDK" CACHE STRING "Directory of Bonjour SDK")
     target_include_directories(${PROJECT_NAME} PRIVATE "${BONJOUR_SDK_DIR}/Include")
-    set(SDK_LIB_DEPS ${SDK_LIB_DEPS} "${BONJOUR_SDK_DIR}/Lib/Win32/dnssd.lib")
+    if(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
+      set(SDK_LIB_DEPS ${SDK_LIB_DEPS} "${BONJOUR_SDK_DIR}/Lib/x64/dnssd.lib")
+    else()
+      set(SDK_LIB_DEPS ${SDK_LIB_DEPS} "${BONJOUR_SDK_DIR}/Lib/Win32/dnssd.lib")
+    endif()
   endif()
 endif()
 
