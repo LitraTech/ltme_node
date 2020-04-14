@@ -23,9 +23,9 @@
     -->
 
     <!-- Minimum and maximum range value of published scans -->
-    <!-- Defaults to 0.2 and 30 respectively if not specified -->
+    <!-- Defaults to 0.05 and 30 respectively if not specified -->
     <!--
-    <param name="range_min" value="0.2"/>
+    <param name="range_min" value="0.05"/>
     <param name="range_max" value="30"/>
     -->
   </node>

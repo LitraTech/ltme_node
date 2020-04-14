@@ -7,7 +7,7 @@ const double LidarDriver::ANGLE_MIN_LIMIT = -2.356;
 const double LidarDriver::ANGLE_MAX_LIMIT = 2.356;
 const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MIN = -3.142;
 const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MAX = -3.142;
-const double LidarDriver::RANGE_MIN_LIMIT = 0.2;
+const double LidarDriver::RANGE_MIN_LIMIT = 0.05;
 const double LidarDriver::RANGE_MAX_LIMIT = 30;
 
 LidarDriver::LidarDriver()
