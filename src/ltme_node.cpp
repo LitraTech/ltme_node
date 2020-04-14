@@ -66,7 +66,7 @@ void LidarDriver::run()
 
       device->startStreaming();
 
-      int beam_count = 2048;
+      int beam_count = 1536;
       int beam_index_min = std::ceil(angle_min_ * beam_count / (2 * M_PI));
       int beam_index_max = std::floor(angle_max_ * beam_count / (2 * M_PI));
       int beam_index_excluded_min = std::ceil(angle_excluded_min_ * beam_count / (2 * M_PI));
@@ -76,8 +76,8 @@ void LidarDriver::run()
       laser_scan_.angle_min = angle_min_;
       laser_scan_.angle_max = angle_max_;
       laser_scan_.angle_increment = 2 * M_PI / beam_count;
-      laser_scan_.time_increment = 1.0 / 15 / beam_count;
-      laser_scan_.scan_time = 1.0 / 15;
+      laser_scan_.time_increment = 1.0 / 20 / beam_count;
+      laser_scan_.scan_time = 1.0 / 20;
       laser_scan_.range_min = range_min_;
       laser_scan_.range_max = range_max_;
       laser_scan_.ranges.resize(beam_index_max - beam_index_min + 1);
