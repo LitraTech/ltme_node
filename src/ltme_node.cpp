@@ -81,6 +81,7 @@ void LidarDriver::run()
       laser_scan_.range_min = range_min_;
       laser_scan_.range_max = range_max_;
       laser_scan_.ranges.resize(beam_index_max - beam_index_min + 1);
+      laser_scan_.intensities.resize(beam_index_max - beam_index_min + 1);
 
       auto readScanBlock = [&device](ldcp_sdk::ScanBlock& scan_block) {
         if (device->readScanBlock(scan_block) != ldcp_sdk::no_error)
@@ -96,11 +97,13 @@ void LidarDriver::run()
           if (beam_index >= beam_index_excluded_min && beam_index <= beam_index_excluded_max)
             continue;
           laser_scan_.ranges[beam_index - beam_index_min] = scan_block.layers[0].ranges[i] * 0.002;
+          laser_scan_.intensities[beam_index - beam_index_min] = scan_block.layers[0].intensities[i];
         }
       };
 
       while (nh_.ok()) {
         std::fill(laser_scan_.ranges.begin(), laser_scan_.ranges.end(), 0.0);
+        std::fill(laser_scan_.intensities.begin(), laser_scan_.intensities.end(), 0.0);
 
         ldcp_sdk::ScanBlock scan_block;
         try {
