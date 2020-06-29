@@ -22,5 +22,9 @@
     <!-- Defaults to 0.05 and 30 respectively if not specified -->
     <!-- <param name="range_min" value="0.05"/> -->
     <!-- <param name="range_max" value="30"/> -->
+
+    <!-- Number of neighboring measurements to be averaged -->
+    <!-- Averaging reduces jitter but angular resolution will also decrease by the same factor -->
+    <!-- <param name="average_factor" value="2"/> -->
   </node>
 </launch>

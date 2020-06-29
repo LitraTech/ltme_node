@@ -16,6 +16,7 @@ public:
   const static double DEFAULT_ANGLE_EXCLUDED_MAX;
   const static double RANGE_MIN_LIMIT;
   const static double RANGE_MAX_LIMIT;
+  const static int AVERAGE_FACTOR;
 
 public:
   LidarDriver();
@@ -38,6 +39,7 @@ private:
   double angle_excluded_max_;
   double range_min_;
   double range_max_;
+  int average_factor_;
 };
 
 #endif

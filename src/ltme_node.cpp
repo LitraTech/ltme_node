@@ -9,6 +9,7 @@ const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MIN = -3.142;
 const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MAX = -3.142;
 const double LidarDriver::RANGE_MIN_LIMIT = 0.05;
 const double LidarDriver::RANGE_MAX_LIMIT = 30;
+const int LidarDriver::AVERAGE_FACTOR = 1;
 
 LidarDriver::LidarDriver()
   : nh_private_("~")
@@ -28,6 +29,7 @@ LidarDriver::LidarDriver()
   nh_private_.param<double>("angle_excluded_max", angle_excluded_max_, DEFAULT_ANGLE_EXCLUDED_MAX);
   nh_private_.param<double>("range_min", range_min_, RANGE_MIN_LIMIT);
   nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT);
+  nh_private_.param<int>("average_factor", average_factor_, AVERAGE_FACTOR);
 
   if (!(angle_min_ < angle_max_)) {
     ROS_ERROR("angle_min (%f) can't be larger than or equal to angle_max (%f)", angle_min_, angle_max_);
@@ -51,6 +53,10 @@ LidarDriver::LidarDriver()
   }
   if (range_max_ > RANGE_MAX_LIMIT) {
     ROS_ERROR("range_max is set to %f while its maximum allowed value is %f", range_max_, RANGE_MAX_LIMIT);
+    exit(-1);
+  }
+  if (average_factor_ <= 0 || average_factor_ > 8) {
+    ROS_ERROR("average_factor is set to %d while its valid value is between 1 and 8", average_factor_);
     exit(-1);
   }
 
@@ -119,7 +125,46 @@ void LidarDriver::run()
           }
           updateLaserScan(scan_block);
 
-          laser_scan_publisher_.publish(laser_scan_);
+          if (average_factor_ == 1)
+            laser_scan_publisher_.publish(laser_scan_);
+          else {
+            sensor_msgs::LaserScan laser_scan_averaged;
+
+            laser_scan_averaged.header.frame_id = laser_scan_.header.frame_id;
+            laser_scan_averaged.angle_min = laser_scan_.angle_min;
+            laser_scan_averaged.angle_max = laser_scan_.angle_max;
+            laser_scan_averaged.angle_increment = laser_scan_.angle_increment * average_factor_;
+            laser_scan_averaged.time_increment = laser_scan_.time_increment * average_factor_;
+            laser_scan_averaged.scan_time = laser_scan_.scan_time;
+            laser_scan_averaged.range_min = laser_scan_.range_min;
+            laser_scan_averaged.range_max = laser_scan_.range_max;
+            laser_scan_averaged.ranges.resize(laser_scan_.ranges.size() / average_factor_);
+            laser_scan_averaged.intensities.resize(laser_scan_.intensities.size() / average_factor_);
+
+            for (int i = 0; i < laser_scan_.ranges.size() / average_factor_; i++) {
+              double ranges_total = 0, intensities_total = 0;
+              int count = 0;
+              for (int j = 0; j < average_factor_; j++) {
+                int index = i * average_factor_ + j;
+                if (laser_scan_.ranges[index] != 0) {
+                  ranges_total += laser_scan_.ranges[index];
+                  intensities_total += laser_scan_.intensities[index];
+                  count++;
+                }
+              }
+
+              if (count > 0) {
+                laser_scan_averaged.ranges[i] = ranges_total / count;
+                laser_scan_averaged.intensities[i] = (int)(intensities_total / count);
+              }
+              else {
+                laser_scan_averaged.ranges[i] = 0;
+                laser_scan_averaged.intensities[i] = 0;
+              }
+            }
+
+            laser_scan_publisher_.publish(laser_scan_averaged);
+          }
         }
         catch (const std::exception&) {
           ROS_WARN("Error reading data from device");
