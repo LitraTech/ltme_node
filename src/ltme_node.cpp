@@ -130,6 +130,7 @@ void LidarDriver::run()
           else {
             sensor_msgs::LaserScan laser_scan_averaged;
 
+            laser_scan_averaged.header.stamp = laser_scan_.header.stamp;
             laser_scan_averaged.header.frame_id = laser_scan_.header.frame_id;
             laser_scan_averaged.angle_min = laser_scan_.angle_min;
             laser_scan_averaged.angle_max = laser_scan_.angle_max;
