@@ -60,6 +60,18 @@ bool Session::isOpened() const
   return (transport_ && transport_->isConnected());
 }
 
+rapidjson::Document Session::createEmptyRequestObject()
+{
+  rapidjson::Document request;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+
+  request.SetObject()
+      .AddMember("jsonrpc", "2.0", allocator)
+      .AddMember("method", rapidjson::Value(), allocator);
+
+  return request;
+}
+
 void Session::executeCommand(rapidjson::Document request)
 {
   request.AddMember("id", ++id_, request.GetAllocator());

@@ -1,46 +1,42 @@
 #ifndef LDCP_SDK_DEVICE_H_
 #define LDCP_SDK_DEVICE_H_
 
-#include "ldcp/device_info.h"
-#include "ldcp/error.h"
-#include "ldcp/data_types.h"
+#include "ldcp/device_base.h"
 
 namespace ldcp_sdk
 {
 
 class Session;
 
-class Device
+class Device : public DeviceBase
 {
 public:
   Device(const DeviceInfo& device_info);
   Device(const Location& location);
-  ~Device();
+  Device(DeviceBase&& other);
 
-  const Location& location() const;
+  error_t queryModel(std::string& model);
+  error_t querySerial(std::string& serial);
+  error_t queryFirmwareVersion(std::string& firmware_version);
+  error_t queryHardwareVersion(std::string& hardware_version);
+  error_t queryState(std::string& state);
 
-  void setTimeout(int timeout);
-
-  error_t open();
-  void close();
-
-  error_t getIdentityInfo(std::map<std::string, std::string>& identity_info);
-  error_t getVersionInfo(std::map<std::string, std::string>& version_info);
-  error_t getStatusInfo(std::map<std::string, std::string>& status_info);
-  error_t enterLowPower();
-  error_t exitLowPower();
   error_t readTimestamp(uint32_t& timestamp);
   error_t resetTimestamp();
-  void reboot();
-  void rebootToBootloader();
 
+  error_t startMeasurement();
+  error_t stopMeasurement();
   error_t startStreaming();
-  error_t readScanBlock(ScanBlock& scan_block);
   error_t stopStreaming();
 
-private:
-  std::unique_ptr<Location> location_;
-  std::unique_ptr<Session> session_;
+  error_t readScanBlock(ScanBlock& scan_block);
+
+  error_t getNetworkAddress(in_addr_t& address);
+  error_t getSubnetMask(in_addr_t& subnet);
+  error_t getScanFrequency(int& frequency);
+  error_t setNetworkAddress(in_addr_t address);
+  error_t setSubnetMask(in_addr_t subnet);
+  error_t persistSettings();
 };
 
 }

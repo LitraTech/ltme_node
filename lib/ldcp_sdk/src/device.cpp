@@ -2,161 +2,157 @@
 #include "ldcp/session.h"
 #include "ldcp/utility.h"
 
+#include <asio.hpp>
+
 namespace ldcp_sdk
 {
 
-static rapidjson::Document CreateEmptyRequestObject();
-
 Device::Device(const DeviceInfo& device_info)
-  : Device(device_info.location())
+  : DeviceBase(device_info)
 {
 }
 
 Device::Device(const Location& location)
-  : session_(new Session())
+  : DeviceBase(location)
 {
-  if (typeid(location) == typeid(NetworkLocation))
-    location_ = std::unique_ptr<NetworkLocation>(new NetworkLocation((const NetworkLocation&)location));
 }
 
-Device::~Device()
+Device::Device(DeviceBase&& other)
+  : DeviceBase(std::move(other))
 {
-  if (session_->isOpened())
-    session_->close();
 }
 
-const Location& Device::location() const
+error_t Device::queryModel(std::string& model)
 {
-  return *location_;
-}
-
-void Device::setTimeout(int timeout)
-{
-  session_->setTimeout(timeout);
-}
-
-error_t Device::open()
-{
-  return session_->open(*location_);
-}
-
-void Device::close()
-{
-  session_->close();
-}
-
-error_t Device::getIdentityInfo(std::map<std::string, std::string>& identity_info)
-{
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
   rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
   request["method"].SetString("device/queryInfo");
   request.AddMember("params",
                     rapidjson::Value().SetObject()
-                      .AddMember("category", "identity", allocator), allocator);
+                      .AddMember("entry", "identity.model", allocator), allocator);
 
   error_t result = session_->executeCommand(std::move(request), response);
 
-  if (result == error_t::no_error) {
-    identity_info.clear();
-    for (const auto& member : response["result"].GetObject())
-      identity_info[member.name.GetString()] = member.value.GetString();
-  }
+  if (result == error_t::no_error)
+    model = response["result"].GetString();
 
   return result;
 }
 
-error_t Device::getVersionInfo(std::map<std::string, std::string>& version_info)
+error_t Device::querySerial(std::string& serial)
 {
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
   rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
   request["method"].SetString("device/queryInfo");
   request.AddMember("params",
                     rapidjson::Value().SetObject()
-                      .AddMember("category", "version", allocator), allocator);
+                      .AddMember("entry", "identity.serial", allocator), allocator);
 
   error_t result = session_->executeCommand(std::move(request), response);
 
-  if (result == error_t::no_error) {
-    version_info.clear();
-    for (const auto& member : response["result"].GetObject())
-      version_info[member.name.GetString()] = member.value.GetString();
-  }
+  if (result == error_t::no_error)
+    serial = response["result"].GetString();
 
   return result;
 }
 
-error_t Device::getStatusInfo(std::map<std::string, std::string>& status_info)
+error_t Device::queryFirmwareVersion(std::string& firmware_version)
 {
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
   rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
   request["method"].SetString("device/queryInfo");
   request.AddMember("params",
                     rapidjson::Value().SetObject()
-                      .AddMember("category", "status", allocator), allocator);
+                      .AddMember("entry", "version.firmware", allocator), allocator);
 
   error_t result = session_->executeCommand(std::move(request), response);
 
-  if (result == error_t::no_error) {
-    status_info.clear();
-    for (const auto& member : response["result"].GetObject())
-      status_info[member.name.GetString()] = member.value.GetString();
-  }
+  if (result == error_t::no_error)
+    firmware_version = response["result"].GetString();
 
   return result;
 }
 
-error_t Device::enterLowPower()
+error_t Device::queryHardwareVersion(std::string& hardware_version)
 {
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
-  request["method"].SetString("device/enterLowPower");
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("device/queryInfo");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "version.hardware", allocator), allocator);
+
   error_t result = session_->executeCommand(std::move(request), response);
+
+  if (result == error_t::no_error)
+    hardware_version = response["result"].GetString();
+
   return result;
 }
 
-error_t Device::exitLowPower()
+error_t Device::queryState(std::string& state)
 {
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
-  request["method"].SetString("device/exitLowPower");
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("device/queryInfo");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "status.state", allocator), allocator);
+
   error_t result = session_->executeCommand(std::move(request), response);
+
+  if (result == error_t::no_error)
+    state = response["result"].GetString();
+
   return result;
 }
 
 error_t Device::readTimestamp(uint32_t& timestamp)
 {
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
   request["method"].SetString("device/readTimestamp");
   error_t result = session_->executeCommand(std::move(request), response);
   if (result == error_t::no_error)
-    timestamp = (uint32_t)response["result"]["timestamp"].GetInt64();
+    timestamp = (uint32_t)response["result"].GetInt64();
   return result;
 }
 
 error_t Device::resetTimestamp()
 {
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
   request["method"].SetString("device/resetTimestamp");
   error_t result = session_->executeCommand(std::move(request), response);
   return result;
 }
 
-void Device::reboot()
+error_t Device::startMeasurement()
 {
-  rapidjson::Document request = CreateEmptyRequestObject();
-  request["method"].SetString("device/reboot");
-  session_->executeCommand(std::move(request));
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  request["method"].SetString("scan/startMeasurement");
+  error_t result = session_->executeCommand(std::move(request), response);
+  return result;
 }
 
-void Device::rebootToBootloader()
+error_t Device::stopMeasurement()
 {
-  rapidjson::Document request = CreateEmptyRequestObject();
-  request["method"].SetString("device/rebootToBootloader");
-  session_->executeCommand(std::move(request));
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  request["method"].SetString("scan/stopMeasurement");
+  error_t result = session_->executeCommand(std::move(request), response);
+  return result;
 }
 
 error_t Device::startStreaming()
 {
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
   request["method"].SetString("scan/startStreaming");
+  error_t result = session_->executeCommand(std::move(request), response);
+  return result;
+}
+
+error_t Device::stopStreaming()
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  request["method"].SetString("scan/stopStreaming");
   error_t result = session_->executeCommand(std::move(request), response);
   return result;
 }
@@ -193,24 +189,100 @@ error_t Device::readScanBlock(ScanBlock& scan_block)
   return result;
 }
 
-error_t Device::stopStreaming()
+error_t Device::getNetworkAddress(in_addr_t& address)
 {
-  rapidjson::Document request = CreateEmptyRequestObject(), response;
-  request["method"].SetString("scan/stopStreaming");
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "connectivity.network.ipv4.address", allocator), allocator);
+
   error_t result = session_->executeCommand(std::move(request), response);
+
+  if (result == error_t::no_error)
+    address = htonl(asio::ip::address_v4::from_string(response["result"].GetString()).to_uint());
+
   return result;
 }
 
-static rapidjson::Document CreateEmptyRequestObject()
+error_t Device::getSubnetMask(in_addr_t& subnet)
 {
-  rapidjson::Document request;
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
   rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "connectivity.network.ipv4.subnet", allocator), allocator);
 
-  request.SetObject()
-      .AddMember("jsonrpc", "2.0", allocator)
-      .AddMember("method", rapidjson::Value(), allocator);
+  error_t result = session_->executeCommand(std::move(request), response);
 
-  return request;
+  if (result == error_t::no_error)
+    subnet = htonl(asio::ip::address_v4::from_string(response["result"].GetString()).to_uint());
+
+  return result;
+}
+
+error_t Device::getScanFrequency(int& frequency)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "scan.frequency", allocator), allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  if (result == error_t::no_error)
+    frequency = response["result"].GetInt();
+
+  return result;
+}
+
+error_t Device::setNetworkAddress(in_addr_t address)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "connectivity.network.ipv4.address", allocator)
+                      .AddMember("value", rapidjson::Value().SetString(
+                        asio::ip::address_v4(ntohl(address)).to_string().c_str(), allocator), allocator),
+                    allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
+error_t Device::setSubnetMask(in_addr_t subnet)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "connectivity.network.ipv4.subnet", allocator)
+                      .AddMember("value", rapidjson::Value().SetString(
+                        asio::ip::address_v4(ntohl(subnet)).to_string().c_str(), allocator), allocator),
+                    allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
+error_t Device::persistSettings()
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/persist");
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
 }
 
 }

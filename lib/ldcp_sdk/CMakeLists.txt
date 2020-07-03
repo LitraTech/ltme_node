@@ -10,6 +10,7 @@ endif()
 
 set(SDK_SRC_DIR "src")
 set(SDK_SRC
+  "${SDK_SRC_DIR}/device_base.cpp"
   "${SDK_SRC_DIR}/device.cpp"
   "${SDK_SRC_DIR}/device_info.cpp"
   "${SDK_SRC_DIR}/location.cpp"

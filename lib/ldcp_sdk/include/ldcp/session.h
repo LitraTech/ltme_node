@@ -23,8 +23,10 @@ public:
   void close();
   bool isOpened() const;
 
+  rapidjson::Document createEmptyRequestObject();
   void executeCommand(rapidjson::Document request);
   error_t executeCommand(rapidjson::Document request, rapidjson::Document& response);
+
   error_t pollForScanData(rapidjson::Document& notification);
 
 private:
