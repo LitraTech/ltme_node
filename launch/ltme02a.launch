@@ -8,6 +8,12 @@
     <!-- Frame ID used by the published LaserScan messages -->
     <!-- <param name="frame_id" value="laser"/> -->
 
+    <!-- LTME-02 can be configured with different scan frequencies, ranging from 10 Hz to 30 Hz with 5 Hz increments. -->
+    <!-- The driver automatically queries device for its frequency upon connection and setup LaserScan parameters accordingly. -->
+    <!-- If for some reason this doesn't work for you (e.g., a device with outdated firmware), -->
+    <!-- this parameter can be used to override automatic detection and manually specify a correct frequency value. -->
+    <!-- <param name="scan_frequency_override" value="15"/> -->
+
     <!-- Start and end angle of published scans -->
     <!-- As LTME-02 has an FOV of 270 degrees, the minimum allowed value for angle_min is -2.356 (about -3 * pi / 4), and the maximum allowed value for angle_max is 2.356 (about 3 * pi / 4) -->
     <!-- <param name="angle_min" value="-1.571"/> -->

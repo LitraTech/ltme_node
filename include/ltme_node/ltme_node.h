@@ -10,6 +10,7 @@ class LidarDriver
 {
 public:
   const static std::string DEFAULT_FRAME_ID;
+  const static int DEFAULT_SCAN_FREQUENCY;
   const static double ANGLE_MIN_LIMIT;
   const static double ANGLE_MAX_LIMIT;
   const static double DEFAULT_ANGLE_EXCLUDED_MIN;
@@ -32,6 +33,7 @@ private:
   std::string device_model_;
   std::string device_address_;
   std::string frame_id_;
+  int scan_frequency_override_;
   double angle_min_;
   double angle_max_;
   double angle_excluded_min_;

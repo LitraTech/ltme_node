@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 
 const std::string LidarDriver::DEFAULT_FRAME_ID = "laser";
+const int LidarDriver::DEFAULT_SCAN_FREQUENCY = 15;
 const double LidarDriver::ANGLE_MIN_LIMIT = -2.356;
 const double LidarDriver::ANGLE_MAX_LIMIT = 2.356;
 const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MIN = -3.142;
@@ -22,6 +23,7 @@ LidarDriver::LidarDriver()
     exit(-1);
   }
   nh_private_.param<std::string>("frame_id", frame_id_, DEFAULT_FRAME_ID);
+  nh_private_.param<int>("scan_frequency_override", scan_frequency_override_, 0);
   nh_private_.param<double>("angle_min", angle_min_, ANGLE_MIN_LIMIT);
   nh_private_.param<double>("angle_max", angle_max_, ANGLE_MAX_LIMIT);
   nh_private_.param<double>("angle_excluded_min", angle_excluded_min_, DEFAULT_ANGLE_EXCLUDED_MIN);
@@ -29,6 +31,11 @@ LidarDriver::LidarDriver()
   nh_private_.param<double>("range_min", range_min_, RANGE_MIN_LIMIT);
   nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT);
 
+  if (scan_frequency_override_ != 0 &&
+    (scan_frequency_override_ < 10 || scan_frequency_override_ > 30 || scan_frequency_override_ % 5 != 0)) {
+    ROS_ERROR("Scan frequency %d not supported", scan_frequency_override_);
+    exit(-1);
+  }
   if (!(angle_min_ < angle_max_)) {
     ROS_ERROR("angle_min (%f) can't be larger than or equal to angle_max (%f)", angle_min_, angle_max_);
     exit(-1);
@@ -64,9 +71,25 @@ void LidarDriver::run()
     if (device) {
       ROS_INFO("Device opened");
 
+      int scan_frequency = DEFAULT_SCAN_FREQUENCY;
+      if (scan_frequency_override_ != 0)
+        scan_frequency = scan_frequency_override_;
+      else {
+        if (device->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
+          ROS_WARN("Unable to query device for scan frequency and will use %d as the frequency value", scan_frequency);
+      }
+
       device->startStreaming();
 
-      int beam_count = 2048;
+      int beam_count = 0;
+      switch (scan_frequency) {
+        case 10: beam_count = 3072; break;
+        case 15: beam_count = 2048; break;
+        case 20: beam_count = 1536; break;
+        case 25:
+        case 30: beam_count = 1024; break;
+        default: beam_count = 2048; break;
+      }
       int beam_index_min = std::ceil(angle_min_ * beam_count / (2 * M_PI));
       int beam_index_max = std::floor(angle_max_ * beam_count / (2 * M_PI));
       int beam_index_excluded_min = std::ceil(angle_excluded_min_ * beam_count / (2 * M_PI));
@@ -76,8 +99,8 @@ void LidarDriver::run()
       laser_scan_.angle_min = angle_min_;
       laser_scan_.angle_max = angle_max_;
       laser_scan_.angle_increment = 2 * M_PI / beam_count;
-      laser_scan_.time_increment = 1.0 / 15 / beam_count;
-      laser_scan_.scan_time = 1.0 / 15;
+      laser_scan_.time_increment = 1.0 / scan_frequency / beam_count;
+      laser_scan_.scan_time = 1.0 / scan_frequency;
       laser_scan_.range_min = range_min_;
       laser_scan_.range_max = range_max_;
       laser_scan_.ranges.resize(beam_index_max - beam_index_min + 1);
