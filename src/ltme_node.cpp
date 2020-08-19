@@ -2,6 +2,8 @@
 
 #include <arpa/inet.h>
 
+#include <sensor_msgs/LaserScan.h>
+
 const std::string LidarDriver::DEFAULT_FRAME_ID = "laser";
 const int LidarDriver::DEFAULT_SCAN_FREQUENCY = 15;
 const double LidarDriver::ANGLE_MIN_LIMIT = -2.356;
@@ -13,6 +15,7 @@ const double LidarDriver::RANGE_MAX_LIMIT = 30;
 
 LidarDriver::LidarDriver()
   : nh_private_("~")
+  , hibernation_requested_(false)
 {
   if (!nh_private_.getParam("device_model", device_model_)) {
     ROS_ERROR("Missing required parameter \"device_model\"");
@@ -60,26 +63,71 @@ LidarDriver::LidarDriver()
     ROS_ERROR("range_max is set to %f while its maximum allowed value is %f", range_max_, RANGE_MAX_LIMIT);
     exit(-1);
   }
-
-  laser_scan_publisher_ = nh_.advertise<sensor_msgs::LaserScan>("scan", 16);
 }
 
 void LidarDriver::run()
 {
+  std::unique_lock<std::mutex> lock(mutex_);
+
+  ros::Publisher laser_scan_publisher = nh_.advertise<sensor_msgs::LaserScan>("scan", 16);
+  ros::ServiceServer query_serial_service = nh_private_.advertiseService<ltme_node::QuerySerialRequest, ltme_node::QuerySerialResponse>
+    ("query_serial", std::bind(&LidarDriver::querySerialService, this, std::placeholders::_1, std::placeholders::_2));
+  ros::ServiceServer query_firmware_service = nh_private_.advertiseService<ltme_node::QueryFirmwareVersionRequest, ltme_node::QueryFirmwareVersionResponse>
+    ("query_firmware_version", std::bind(&LidarDriver::queryFirmwareVersion, this, std::placeholders::_1, std::placeholders::_2));
+  ros::ServiceServer query_hardware_service = nh_private_.advertiseService<ltme_node::QueryHardwareVersionRequest, ltme_node::QueryHardwareVersionResponse>
+    ("query_hardware_version", std::bind(&LidarDriver::queryHardwareVersion, this, std::placeholders::_1, std::placeholders::_2));
+  ros::ServiceServer request_hibernation_service = nh_private_.advertiseService<std_srvs::EmptyRequest, std_srvs::EmptyResponse>
+    ("request_hibernation", std::bind(&LidarDriver::requestHibernationService, this, std::placeholders::_1, std::placeholders::_2));
+  ros::ServiceServer request_wake_up_service = nh_private_.advertiseService<std_srvs::EmptyRequest, std_srvs::EmptyResponse>
+    ("request_wake_up", std::bind(&LidarDriver::requestWakeUpService, this, std::placeholders::_1, std::placeholders::_2));
+
+  ros::AsyncSpinner spinner(1);
+  spinner.start();
+
+  std::string address_str = device_address_;
+  std::string port_str = "2105";
+
+  size_t position = device_address_.find(':');
+  if (position != std::string::npos) {
+    address_str = device_address_.substr(0, position);
+    port_str = device_address_.substr(position + 1);
+  }
+
+  in_addr_t address = htonl(INADDR_NONE);
+  in_port_t port = 0;
+  try {
+    address = inet_addr(address_str.c_str());
+    if (address == htonl(INADDR_NONE))
+      throw std::exception();
+    port = htons(std::stoi(port_str));
+  }
+  catch (...) {
+    ROS_ERROR("Invalid device address: %s", device_address_.c_str());
+    exit(-1);
+  }
+
+  ldcp_sdk::NetworkLocation location(address, port);
+  device_ = std::unique_ptr<ldcp_sdk::Device>(new ldcp_sdk::Device(location));
+
+  ros::Rate loop_rate(0.3);
   while (nh_.ok()) {
-    std::unique_ptr<ldcp_sdk::Device> device = waitForDevice();
-    if (device) {
+    if (device_->open() == ldcp_sdk::no_error) {
+      hibernation_requested_ = false;
+
+      lock.unlock();
+
       ROS_INFO("Device opened");
 
       int scan_frequency = DEFAULT_SCAN_FREQUENCY;
       if (scan_frequency_override_ != 0)
         scan_frequency = scan_frequency_override_;
       else {
-        if (device->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
+        if (device_->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
           ROS_WARN("Unable to query device for scan frequency and will use %d as the frequency value", scan_frequency);
       }
 
-      device->startStreaming();
+      device_->startMeasurement();
+      device_->startStreaming();
 
       int beam_count = 0;
       switch (scan_frequency) {
@@ -95,19 +143,20 @@ void LidarDriver::run()
       int beam_index_excluded_min = std::ceil(angle_excluded_min_ * beam_count / (2 * M_PI));
       int beam_index_excluded_max = std::floor(angle_excluded_max_ * beam_count / (2 * M_PI));
 
-      laser_scan_.header.frame_id = frame_id_;
-      laser_scan_.angle_min = angle_min_;
-      laser_scan_.angle_max = angle_max_;
-      laser_scan_.angle_increment = 2 * M_PI / beam_count;
-      laser_scan_.time_increment = 1.0 / scan_frequency / beam_count;
-      laser_scan_.scan_time = 1.0 / scan_frequency;
-      laser_scan_.range_min = range_min_;
-      laser_scan_.range_max = range_max_;
-      laser_scan_.ranges.resize(beam_index_max - beam_index_min + 1);
-      laser_scan_.intensities.resize(beam_index_max - beam_index_min + 1);
+      sensor_msgs::LaserScan laser_scan;
+      laser_scan.header.frame_id = frame_id_;
+      laser_scan.angle_min = angle_min_;
+      laser_scan.angle_max = angle_max_;
+      laser_scan.angle_increment = 2 * M_PI / beam_count;
+      laser_scan.time_increment = 1.0 / scan_frequency / beam_count;
+      laser_scan.scan_time = 1.0 / scan_frequency;
+      laser_scan.range_min = range_min_;
+      laser_scan.range_max = range_max_;
+      laser_scan.ranges.resize(beam_index_max - beam_index_min + 1);
+      laser_scan.intensities.resize(beam_index_max - beam_index_min + 1);
 
-      auto readScanBlock = [&device](ldcp_sdk::ScanBlock& scan_block) {
-        if (device->readScanBlock(scan_block) != ldcp_sdk::no_error)
+      auto readScanBlock = [&](ldcp_sdk::ScanBlock& scan_block) {
+        if (device_->readScanBlock(scan_block) != ldcp_sdk::no_error)
           throw std::exception();
       };
 
@@ -119,14 +168,14 @@ void LidarDriver::run()
             continue;
           if (beam_index >= beam_index_excluded_min && beam_index <= beam_index_excluded_max)
             continue;
-          laser_scan_.ranges[beam_index - beam_index_min] = scan_block.layers[0].ranges[i] * 0.002;
-          laser_scan_.intensities[beam_index - beam_index_min] = scan_block.layers[0].intensities[i];
+          laser_scan.ranges[beam_index - beam_index_min] = scan_block.layers[0].ranges[i] * 0.002;
+          laser_scan.intensities[beam_index - beam_index_min] = scan_block.layers[0].intensities[i];
         }
       };
 
       while (nh_.ok()) {
-        std::fill(laser_scan_.ranges.begin(), laser_scan_.ranges.end(), 0.0);
-        std::fill(laser_scan_.intensities.begin(), laser_scan_.intensities.end(), 0.0);
+        std::fill(laser_scan.ranges.begin(), laser_scan.ranges.end(), 0.0);
+        std::fill(laser_scan.intensities.begin(), laser_scan.intensities.end(), 0.0);
 
         ldcp_sdk::ScanBlock scan_block;
         try {
@@ -134,7 +183,7 @@ void LidarDriver::run()
             readScanBlock(scan_block);
           } while (scan_block.block_id != 0);
 
-          laser_scan_.header.stamp = ros::Time::now();
+          laser_scan.header.stamp = ros::Time::now();
 
           while (scan_block.block_id != 8 - 1) {
             updateLaserScan(scan_block);
@@ -142,7 +191,17 @@ void LidarDriver::run()
           }
           updateLaserScan(scan_block);
 
-          laser_scan_publisher_.publish(laser_scan_);
+          laser_scan_publisher.publish(laser_scan);
+
+          if (hibernation_requested_.load()) {
+            device_->stopMeasurement();
+            ROS_INFO("Device brought into hibernation");
+            ros::Rate loop_rate(10);
+            while (hibernation_requested_.load())
+              loop_rate.sleep();
+            device_->startMeasurement();
+            ROS_INFO("Woken up from hibernation");
+          }
         }
         catch (const std::exception&) {
           ROS_WARN("Error reading data from device");
@@ -150,54 +209,81 @@ void LidarDriver::run()
         }
       }
 
-      device->stopStreaming();
-      device->close();
+      device_->stopStreaming();
+
+      lock.lock();
+      device_->close();
 
       ROS_INFO("Device closed");
     }
-    else
-      break;
-  }
-}
-
-std::unique_ptr<ldcp_sdk::Device> LidarDriver::waitForDevice()
-{
-  std::string address_str = device_address_;
-  std::string port_str = "2105";
-
-  size_t position = device_address_.find(':');
-  if (position != std::string::npos) {
-    address_str = device_address_.substr(0, position);
-    port_str = device_address_.substr(position + 1);
-  }
-
-  in_addr_t address = INADDR_NONE;
-  in_port_t port = 0;
-  try {
-    address = inet_addr(address_str.c_str());
-    if (address == INADDR_NONE)
-      throw std::exception();
-    port = htons(std::stoi(port_str));
-  }
-  catch (...) {
-    ROS_ERROR("Invalid device address: %s", device_address_.c_str());
-    exit(-1);
-  }
-
-  ldcp_sdk::NetworkLocation location(address, port);
-  std::unique_ptr<ldcp_sdk::Device> device(new ldcp_sdk::Device(location));
-
-  ros::Rate loop_rate(0.3);
-  while (nh_.ok()) {
-    if (device->open() == ldcp_sdk::no_error)
-      return device;
     else {
       ROS_INFO_THROTTLE(5, "Waiting for device... [%s]", device_address_.c_str());
       loop_rate.sleep();
     }
   }
+}
 
-  return nullptr;
+bool LidarDriver::querySerialService(ltme_node::QuerySerialRequest& request,
+                                     ltme_node::QuerySerialResponse& response)
+{
+  std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+  if (lock.owns_lock()) {
+    std::string serial;
+    if (device_->querySerial(serial) == ldcp_sdk::no_error) {
+      response.serial = serial;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool LidarDriver::queryFirmwareVersion(ltme_node::QueryFirmwareVersionRequest& request,
+                                       ltme_node::QueryFirmwareVersionResponse& response)
+{
+  std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+  if (lock.owns_lock()) {
+    std::string firmware_version;
+    if (device_->queryFirmwareVersion(firmware_version) == ldcp_sdk::no_error) {
+      response.firmware_version = firmware_version;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool LidarDriver::queryHardwareVersion(ltme_node::QueryHardwareVersionRequest& request, ltme_node::QueryHardwareVersionResponse& response)
+{
+  std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+  if (lock.owns_lock()) {
+    std::string hardware_version;
+    if (device_->queryHardwareVersion(hardware_version) == ldcp_sdk::no_error) {
+      response.hardware_version = hardware_version;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool LidarDriver::requestHibernationService(std_srvs::EmptyRequest& request,
+                                            std_srvs::EmptyResponse& response)
+{
+  std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+  if (lock.owns_lock()) {
+    hibernation_requested_ = true;
+    return true;
+  }
+  return false;
+}
+
+bool LidarDriver::requestWakeUpService(std_srvs::EmptyRequest& request,
+                                       std_srvs::EmptyResponse& response)
+{
+  std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+  if (lock.owns_lock()) {
+    hibernation_requested_ = false;
+    return true;
+  }
+  return false;
 }
 
 int main(int argc, char* argv[])

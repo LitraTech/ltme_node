@@ -6,7 +6,17 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
+  message_generation
 )
+
+add_service_files(
+  FILES
+  QuerySerial.srv
+  QueryFirmwareVersion.srv
+  QueryHardwareVersion.srv
+)
+
+generate_messages()
 
 catkin_package()
 

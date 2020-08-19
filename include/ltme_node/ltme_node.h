@@ -1,10 +1,17 @@
 #ifndef LTME_NODE_H
 #define LTME_NODE_H
 
-#include "ldcp/device.h"
+#include "ltme_node/QuerySerial.h"
+#include "ltme_node/QueryFirmwareVersion.h"
+#include "ltme_node/QueryHardwareVersion.h"
 
 #include <ros/ros.h>
-#include <sensor_msgs/LaserScan.h>
+#include <std_srvs/Empty.h>
+
+#include "ldcp/device.h"
+
+#include <mutex>
+#include <atomic>
 
 class LidarDriver
 {
@@ -23,12 +30,19 @@ public:
   void run();
 
 private:
-  std::unique_ptr<ldcp_sdk::Device> waitForDevice();
+  bool querySerialService(ltme_node::QuerySerialRequest& request,
+                          ltme_node::QuerySerialResponse& response);
+  bool queryFirmwareVersion(ltme_node::QueryFirmwareVersionRequest& request,
+                            ltme_node::QueryFirmwareVersionResponse& response);
+  bool queryHardwareVersion(ltme_node::QueryHardwareVersionRequest& request,
+                            ltme_node::QueryHardwareVersionResponse& response);
+  bool requestHibernationService(std_srvs::EmptyRequest& request,
+                                 std_srvs::EmptyResponse& response);
+  bool requestWakeUpService(std_srvs::EmptyRequest& request,
+                            std_srvs::EmptyResponse& response);
 
 private:
   ros::NodeHandle nh_, nh_private_;
-  ros::Publisher laser_scan_publisher_;
-  sensor_msgs::LaserScan laser_scan_;
 
   std::string device_model_;
   std::string device_address_;
@@ -40,6 +54,11 @@ private:
   double angle_excluded_max_;
   double range_min_;
   double range_max_;
+
+  std::unique_ptr<ldcp_sdk::Device> device_;
+  std::mutex mutex_;
+
+  std::atomic_bool hibernation_requested_;
 };
 
 #endif
