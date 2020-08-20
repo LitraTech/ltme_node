@@ -12,6 +12,7 @@ const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MIN = -3.142;
 const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MAX = -3.142;
 const double LidarDriver::RANGE_MIN_LIMIT = 0.05;
 const double LidarDriver::RANGE_MAX_LIMIT = 30;
+const int LidarDriver::DEFAULT_AVERAGE_FACTOR = 1;
 
 LidarDriver::LidarDriver()
   : nh_private_("~")
@@ -33,6 +34,7 @@ LidarDriver::LidarDriver()
   nh_private_.param<double>("angle_excluded_max", angle_excluded_max_, DEFAULT_ANGLE_EXCLUDED_MAX);
   nh_private_.param<double>("range_min", range_min_, RANGE_MIN_LIMIT);
   nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT);
+  nh_private_.param<int>("average_factor", average_factor_, DEFAULT_AVERAGE_FACTOR);
 
   if (scan_frequency_override_ != 0 &&
     (scan_frequency_override_ < 10 || scan_frequency_override_ > 30 || scan_frequency_override_ % 5 != 0)) {
@@ -61,6 +63,10 @@ LidarDriver::LidarDriver()
   }
   if (range_max_ > RANGE_MAX_LIMIT) {
     ROS_ERROR("range_max is set to %f while its maximum allowed value is %f", range_max_, RANGE_MAX_LIMIT);
+    exit(-1);
+  }
+  if (average_factor_ <= 0 || average_factor_ > 8) {
+    ROS_ERROR("average_factor is set to %d while its valid value is between 1 and 8", average_factor_);
     exit(-1);
   }
 }
@@ -147,13 +153,11 @@ void LidarDriver::run()
       laser_scan.header.frame_id = frame_id_;
       laser_scan.angle_min = angle_min_;
       laser_scan.angle_max = angle_max_;
-      laser_scan.angle_increment = 2 * M_PI / beam_count;
-      laser_scan.time_increment = 1.0 / scan_frequency / beam_count;
+      laser_scan.angle_increment = 2 * M_PI / beam_count * average_factor_;
+      laser_scan.time_increment = 1.0 / scan_frequency / beam_count * average_factor_;
       laser_scan.scan_time = 1.0 / scan_frequency;
       laser_scan.range_min = range_min_;
       laser_scan.range_max = range_max_;
-      laser_scan.ranges.resize(beam_index_max - beam_index_min + 1);
-      laser_scan.intensities.resize(beam_index_max - beam_index_min + 1);
 
       auto readScanBlock = [&](ldcp_sdk::ScanBlock& scan_block) {
         if (device_->readScanBlock(scan_block) != ldcp_sdk::no_error)
@@ -174,6 +178,9 @@ void LidarDriver::run()
       };
 
       while (nh_.ok()) {
+        laser_scan.ranges.resize(beam_index_max - beam_index_min + 1);
+        laser_scan.intensities.resize(beam_index_max - beam_index_min + 1);
+
         std::fill(laser_scan.ranges.begin(), laser_scan.ranges.end(), 0.0);
         std::fill(laser_scan.intensities.begin(), laser_scan.intensities.end(), 0.0);
 
@@ -190,6 +197,34 @@ void LidarDriver::run()
             readScanBlock(scan_block);
           }
           updateLaserScan(scan_block);
+
+          if (average_factor_ != 1) {
+            int final_size = laser_scan.ranges.size() / average_factor_;
+            for (int i = 0; i < final_size; i++) {
+              double ranges_total = 0, intensities_total = 0;
+              int count = 0;
+              for (int j = 0; j < average_factor_; j++) {
+                int index = i * average_factor_ + j;
+                if (laser_scan.ranges[index] != 0) {
+                  ranges_total += laser_scan.ranges[index];
+                  intensities_total += laser_scan.intensities[index];
+                  count++;
+                }
+              }
+
+              if (count > 0) {
+                laser_scan.ranges[i] = ranges_total / count;
+                laser_scan.intensities[i] = (int)(intensities_total / count);
+              }
+              else {
+                laser_scan.ranges[i] = 0;
+                laser_scan.intensities[i] = 0;
+              }
+            }
+
+            laser_scan.ranges.resize(final_size);
+            laser_scan.intensities.resize(final_size);
+          }
 
           laser_scan_publisher.publish(laser_scan);
 
