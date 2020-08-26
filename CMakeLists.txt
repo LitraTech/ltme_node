@@ -3,22 +3,31 @@ project(ltme_node)
 
 add_compile_options(-std=c++11)
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  sensor_msgs
-  message_generation
+find_package(catkin REQUIRED
+  COMPONENTS
+    roscpp
+    sensor_msgs
+    message_generation
+    std_msgs
 )
 
 add_service_files(
+  DIRECTORY srv
   FILES
-  QuerySerial.srv
-  QueryFirmwareVersion.srv
-  QueryHardwareVersion.srv
+    QuerySerial.srv
+    QueryFirmwareVersion.srv
+    QueryHardwareVersion.srv
 )
 
-generate_messages()
+generate_messages(
+  DEPENDENCIES std_msgs
+)
 
-catkin_package()
+catkin_package(
+  CATKIN_DEPENDS
+    message_runtime
+    std_msgs
+)
 
 ###########
 ## Build ##
@@ -35,6 +44,10 @@ include_directories(
 
 add_executable(${PROJECT_NAME}
   src/ltme_node.cpp
+)
+
+add_dependencies(${PROJECT_NAME}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
 )
 
 target_link_libraries(${PROJECT_NAME}
