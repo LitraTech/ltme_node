@@ -172,8 +172,14 @@ void LidarDriver::run()
             continue;
           if (beam_index >= beam_index_excluded_min && beam_index <= beam_index_excluded_max)
             continue;
-          laser_scan.ranges[beam_index - beam_index_min] = scan_block.layers[0].ranges[i] * 0.002;
-          laser_scan.intensities[beam_index - beam_index_min] = scan_block.layers[0].intensities[i];
+          if (scan_block.layers[0].ranges[i] != 0) {
+            laser_scan.ranges[beam_index - beam_index_min] = scan_block.layers[0].ranges[i] * 0.002;
+            laser_scan.intensities[beam_index - beam_index_min] = scan_block.layers[0].intensities[i];
+          }
+          else {
+            laser_scan.ranges[beam_index - beam_index_min] = std::numeric_limits<float>::infinity();
+            laser_scan.intensities[beam_index - beam_index_min] = 0;
+          }
         }
       };
 
