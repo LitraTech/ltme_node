@@ -1,5 +1,6 @@
 #include "ldcp/transport.h"
 #include "ldcp/utility.h"
+#include "ldcp/data_types.h"
 
 #include <rapidjson/ostreamwrapper.h>
 #include <rapidjson/writer.h>
@@ -15,8 +16,6 @@
 namespace ldcp_sdk
 {
 
-const int MESSAGE_LENGTH_MAX = 65535;
-
 class NetworkTransport : public Transport
 {
 public:
@@ -28,12 +27,16 @@ public:
 
   virtual void transmitMessage(rapidjson::Document message);
 
+  virtual error_t enableOob(const Location& location);
+
 private:
   void incomingMessageHandler(const asio::error_code& error, size_t bytes_transferred);
   void outgoingMessageHandler(const asio::error_code& error, size_t);
+  void oobPacketHandler(const asio::error_code& error, size_t bytes_transferred);
 
   rapidjson::Document parseIncomingMessage(size_t length);
   void encapsulateOutgoingMessage(rapidjson::Document& message);
+  bool verifyOobPacket(uint8_t* data, int length);
 
 private:
   std::thread worker_thread_;
@@ -41,16 +44,21 @@ private:
   asio::io_service io_service_;
 
   asio::ip::tcp::endpoint device_address_;
-  asio::ip::tcp::socket socket_;
+  asio::ip::tcp::socket primary_socket_;
 
   asio::streambuf incoming_message_buffer_;
   asio::streambuf outgoing_message_buffers_[3];
   std::deque<rapidjson::Document> outgoing_message_queue_;
+
+  asio::ip::udp::socket oob_socket_;
+
+  std::array<uint8_t, OOB_PACKET_LENGTH_MAX> oob_packet_buffer_;
 };
 
 NetworkTransport::NetworkTransport(const NetworkLocation& location)
   : device_address_(asio::ip::address_v4(ntohl(location.address())), ntohs(location.port()))
-  , socket_(io_service_)
+  , primary_socket_(io_service_)
+  , oob_socket_(io_service_)
 {
 }
 
@@ -61,7 +69,7 @@ error_t NetworkTransport::connect(int timeout)
   std::condition_variable cv;
 
   asio::error_code connect_result = asio::error::would_block;
-  socket_.async_connect(device_address_, [&](const asio::error_code& error) {
+  primary_socket_.async_connect(device_address_, [&](const asio::error_code& error) {
     if (error != asio::error::operation_aborted) {
       {
         std::lock_guard<std::mutex> lock_guard(mutex);
@@ -71,7 +79,7 @@ error_t NetworkTransport::connect(int timeout)
     }
 
     if (!error)
-      asio::async_read_until(socket_, incoming_message_buffer_, "\r\n",
+      asio::async_read_until(primary_socket_, incoming_message_buffer_, "\r\n",
                              std::bind(&NetworkTransport::incomingMessageHandler,
                                        this, std::placeholders::_1, std::placeholders::_2));
   });
@@ -86,7 +94,7 @@ error_t NetworkTransport::connect(int timeout)
   if (wait_result && !connect_result)
     return error_t::no_error;
   else {
-    socket_.close();
+    primary_socket_.close();
     worker_thread_.join();
 
     if (!wait_result)
@@ -100,10 +108,12 @@ error_t NetworkTransport::connect(int timeout)
 
 void NetworkTransport::disconnect()
 {
-  if (socket_.is_open()) {
+  if (primary_socket_.is_open()) {
     io_service_.dispatch([&]() {
-      socket_.shutdown(asio::ip::tcp::socket::shutdown_both);
-      socket_.close();
+      primary_socket_.shutdown(asio::ip::tcp::socket::shutdown_both);
+      primary_socket_.close();
+      if (oob_socket_.is_open())
+        oob_socket_.close();
     });
     worker_thread_.join();
   }
@@ -111,7 +121,7 @@ void NetworkTransport::disconnect()
 
 bool NetworkTransport::isConnected() const
 {
-  return socket_.is_open();
+  return primary_socket_.is_open();
 }
 
 void NetworkTransport::transmitMessage(rapidjson::Document message)
@@ -127,11 +137,37 @@ void NetworkTransport::transmitMessage(rapidjson::Document message)
       std::vector<asio::streambuf::const_buffers_type> buffers = { outgoing_message_buffers_[0].data(),
                                                                    outgoing_message_buffers_[1].data(),
                                                                    outgoing_message_buffers_[2].data() };
-      asio::async_write(socket_, buffers,
+      asio::async_write(primary_socket_, buffers,
                         std::bind(&NetworkTransport::outgoingMessageHandler,
                                   this, std::placeholders::_1, std::placeholders::_2));
     }
   });
+}
+
+error_t NetworkTransport::enableOob(const Location& location)
+{
+  oob_socket_.open(asio::ip::udp::v4());
+
+  const NetworkLocation& network_location = dynamic_cast<const NetworkLocation&>(location);
+  asio::ip::udp::endpoint local_address(asio::ip::address_v4(ntohl(network_location.address())),
+                                        ntohs(network_location.port()));
+  asio::error_code bind_result;
+  oob_socket_.bind(local_address, bind_result);
+
+  if (!bind_result) {
+    oob_socket_.async_receive(asio::buffer(oob_packet_buffer_),
+                              std::bind(&NetworkTransport::oobPacketHandler,
+                                        this, std::placeholders::_1, std::placeholders::_2));
+    return error_t::no_error;
+  }
+  else {
+    oob_socket_.close();
+
+    if (bind_result == asio::error::address_in_use)
+      return error_t::address_in_use;
+    else
+      return error_t::unknown;
+  }
 }
 
 void NetworkTransport::incomingMessageHandler(const asio::error_code& error, size_t bytes_transferred)
@@ -142,7 +178,7 @@ void NetworkTransport::incomingMessageHandler(const asio::error_code& error, siz
       if (!message.IsNull())
         received_message_callback_(std::move(message));
     }
-    asio::async_read_until(socket_, incoming_message_buffer_, "\r\n",
+    asio::async_read_until(primary_socket_, incoming_message_buffer_, "\r\n",
                            std::bind(&NetworkTransport::incomingMessageHandler,
                                      this, std::placeholders::_1, std::placeholders::_2));
   }
@@ -166,13 +202,29 @@ void NetworkTransport::outgoingMessageHandler(const asio::error_code& error, siz
       std::vector<asio::streambuf::const_buffers_type> buffers = { outgoing_message_buffers_[0].data(),
                                                                    outgoing_message_buffers_[1].data(),
                                                                    outgoing_message_buffers_[2].data() };
-      asio::async_write(socket_, buffers,
+      asio::async_write(primary_socket_, buffers,
                         std::bind(&NetworkTransport::outgoingMessageHandler,
                                   this, std::placeholders::_1, std::placeholders::_2));
     }
   }
   else if (error != asio::error::operation_aborted && transmit_error_callback_)
     transmit_error_callback_(error_t::unknown);
+}
+
+void NetworkTransport::oobPacketHandler(const asio::error_code& error, size_t bytes_transferred)
+{
+  if (!error) {
+    if (received_oob_packet_callback_) {
+      if (verifyOobPacket(oob_packet_buffer_.data(), bytes_transferred)) {
+        std::vector<uint8_t> oob_data(oob_packet_buffer_.data(),
+                                      oob_packet_buffer_.data() + bytes_transferred);
+        received_oob_packet_callback_(std::move(oob_data));
+      }
+    }
+    oob_socket_.async_receive(asio::buffer(oob_packet_buffer_),
+                              std::bind(&NetworkTransport::oobPacketHandler,
+                                        this, std::placeholders::_1, std::placeholders::_2));
+  }
 }
 
 rapidjson::Document NetworkTransport::parseIncomingMessage(size_t length)
@@ -277,6 +329,16 @@ void NetworkTransport::encapsulateOutgoingMessage(rapidjson::Document& message)
   ostream_trailing_part << ",\r\n";
 }
 
+bool NetworkTransport::verifyOobPacket(uint8_t* data, int length)
+{
+  OobPacket* oob_packet = reinterpret_cast<OobPacket*>(data);
+  uint16_t saved_checksum = oob_packet->checksum;
+  oob_packet->checksum = 0;
+  bool packet_valid = (Utility::CalculateCRC16(data, data + length) == saved_checksum);
+  oob_packet->checksum = saved_checksum;
+  return packet_valid;
+}
+
 std::unique_ptr<Transport> Transport::create(const Location& location)
 {
   if (typeid(location) == typeid(NetworkLocation))
@@ -299,6 +361,11 @@ void Transport::setTransmitErrorCallback(Transport::TransmitErrorCallback callba
 void Transport::setReceiveErrorCallback(Transport::ReceiveErrorCallback callback)
 {
   receive_error_callback_ = callback;
+}
+
+void Transport::setReceivedOobPacketCallback(Transport::ReceivedOobPacketCallback callback)
+{
+  received_oob_packet_callback_ = callback;
 }
 
 }

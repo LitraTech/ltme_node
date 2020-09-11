@@ -22,7 +22,7 @@ public:
 
   void setTimeout(int timeout);
 
-  error_t open();
+  virtual error_t open();
   void close();
 
   error_t queryOperationMode(std::string& mode);

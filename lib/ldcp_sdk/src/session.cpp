@@ -37,6 +37,7 @@ error_t Session::open(const Location& location)
 #else
   transport_->setReceivedMessageCallback(std::bind(&Session::onMessageReceived, this, std::placeholders::_1));
 #endif
+  transport_->setReceivedOobPacketCallback(std::bind(&Session::onOobPacketReceived, this, std::placeholders::_1));
   error_t connect_result = transport_->connect(timeout_);
   if (connect_result != error_t::no_error)
     transport_ = nullptr;
@@ -52,7 +53,8 @@ void Session::close()
   }
 
   response_queue_.clear();
-  laser_scan_queue_.clear();
+  scan_block_queue_primary_.clear();
+  scan_block_queue_oob_.clear();
 }
 
 bool Session::isOpened() const
@@ -125,15 +127,26 @@ error_t Session::executeCommand(rapidjson::Document request, rapidjson::Document
     return error_t::timed_out;
 }
 
-error_t Session::pollForScanData(rapidjson::Document& notification)
+error_t Session::enableOobTransport(const Location& location)
 {
-  std::unique_lock<std::mutex> lock(laser_scan_mutex_);
-  bool wait_result = laser_scan_queue_cv_.wait_for(lock, std::chrono::milliseconds(timeout_), [&]() {
-    return laser_scan_queue_.size() > 0;
+  return transport_->enableOob(location);
+}
+
+error_t Session::pollForScanBlock(rapidjson::Document& notification, std::vector<uint8_t>& oob_data)
+{
+  std::unique_lock<std::mutex> lock(scan_block_queue_mutex_);
+  bool wait_result = scan_block_queue_cv_.wait_for(lock, std::chrono::milliseconds(timeout_), [&]() {
+    return (scan_block_queue_primary_.size() > 0) || (scan_block_queue_oob_.size() > 0);
   });
   if (wait_result) {
-    notification = std::move(laser_scan_queue_.front());
-    laser_scan_queue_.pop_front();
+    if (scan_block_queue_primary_.size() > 0) {
+      notification = std::move(scan_block_queue_primary_.front());
+      scan_block_queue_primary_.pop_front();
+    }
+    else if (scan_block_queue_oob_.size() > 0) {
+      oob_data = std::move(scan_block_queue_oob_.front());
+      scan_block_queue_oob_.pop_front();
+    }
     return error_t::no_error;
   }
   else
@@ -156,12 +169,21 @@ void Session::onMessageReceived(rapidjson::Document message)
   }
   else if ((message.HasMember("method") && message["method"] == "notification/laserScan") &&
            message.HasMember("params") && !message.HasMember("id")) {
-    std::lock_guard<std::mutex> lock(laser_scan_mutex_);
-    if (laser_scan_queue_.size() == LASER_SCAN_NOTIFICATION_BUFFERING_COUNT)
-      laser_scan_queue_.pop_front();
-    laser_scan_queue_.push_back(std::move(message));
-    laser_scan_queue_cv_.notify_one();
+    std::lock_guard<std::mutex> lock(scan_block_queue_mutex_);
+    if (scan_block_queue_primary_.size() == SCAN_BLOCK_BUFFERING_COUNT)
+      scan_block_queue_primary_.pop_front();
+    scan_block_queue_primary_.push_back(std::move(message));
+    scan_block_queue_cv_.notify_one();
   }
+}
+
+void Session::onOobPacketReceived(std::vector<uint8_t> oob_packet)
+{
+  std::lock_guard<std::mutex> lock(scan_block_queue_mutex_);
+  if (scan_block_queue_oob_.size() == SCAN_BLOCK_BUFFERING_COUNT)
+    scan_block_queue_oob_.pop_front();
+  scan_block_queue_oob_.push_back(std::move(oob_packet));
+  scan_block_queue_cv_.notify_one();
 }
 
 }
