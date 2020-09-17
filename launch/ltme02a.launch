@@ -5,6 +5,14 @@
     <!-- IP address of LTME-02 -->
     <param name="device_address" value="192.168.10.160"/>
 
+    <!-- Enforce specific transport mode used by the device to stream measurement data. -->
+    <!-- If set to "normal" or "oob", device settings will be changed to selected mode in case of a mismatch. -->
+    <!-- Available options are: -->
+    <!-- * none: don't enforce any mode and use device's current configuration -->
+    <!-- * normal: enforce normal (in-band) mode, i.e. TCP connection for command interaction is reused for data streaming -->
+    <!-- * oob: enforce out-of-band mode, where data are streamed through a dedicated UDP channel -->
+    <!-- <param name="enforced_transport_mode" value="none"/> -->
+
     <!-- Frame ID used by the published LaserScan messages -->
     <!-- <param name="frame_id" value="laser"/> -->
 
