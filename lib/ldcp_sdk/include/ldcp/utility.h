@@ -21,6 +21,40 @@ public:
     return checksum;
   }
 
+  static int CalculateBase64EncodedLength(int src_len)
+  {
+    return (src_len + 2) / 3 * 4;
+  }
+
+  static int Base64Encode(const uint8_t* src, int src_len, char* dest)
+  {
+    static const char basis_64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    int i;
+
+    char* p = dest;
+    for (i = 0; i < src_len - 2; i += 3) {
+      *p++ = basis_64[(src[i] >> 2) & 0x3F];
+      *p++ = basis_64[((src[i] & 0x3) << 4) | ((int)(src[i + 1] & 0xF0) >> 4)];
+      *p++ = basis_64[((src[i + 1] & 0xF) << 2) | ((int)(src[i + 2] & 0xC0) >> 6)];
+      *p++ = basis_64[src[i + 2] & 0x3F];
+    }
+    if (i < src_len) {
+      *p++ = basis_64[(src[i] >> 2) & 0x3F];
+      if (i == (src_len - 1)) {
+        *p++ = basis_64[((src[i] & 0x3) << 4)];
+        *p++ = '=';
+      }
+      else {
+        *p++ = basis_64[((src[i] & 0x3) << 4) | ((int)(src[i + 1] & 0xF0) >> 4)];
+        *p++ = basis_64[((src[i + 1] & 0xF) << 2)];
+      }
+      *p++ = '=';
+    }
+
+    return p - dest;
+  }
+
   static int CalculateBase64DecodedLength(const char* src, int src_len)
   {
     int padding_length = 0;

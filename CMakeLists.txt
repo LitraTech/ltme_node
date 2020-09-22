@@ -11,6 +11,8 @@ find_package(catkin REQUIRED
     std_msgs
 )
 
+find_package(OpenSSL)
+
 add_service_files(
   DIRECTORY srv
   FILES
@@ -42,24 +44,35 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(${PROJECT_NAME}
-  src/ltme_node.cpp
+add_executable(ltme_node
+  "src/ltme_node.cpp"
 )
 
-add_dependencies(${PROJECT_NAME}
+add_dependencies(ltme_node
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
 )
 
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(ltme_node
   ${catkin_LIBRARIES}
   ldcp_sdk
 )
+
+if(OPENSSL_FOUND)
+  add_executable(update_firmware
+    "src/update_firmware.cpp"
+  )
+
+  target_link_libraries(update_firmware
+    ldcp_sdk
+    OpenSSL::Crypto
+  )
+endif()
 
 #############
 ## Install ##
 #############
 
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS ltme_node update_firmware
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

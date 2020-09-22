@@ -42,6 +42,8 @@ private:
                                  std_srvs::EmptyResponse& response);
   bool requestWakeUpService(std_srvs::EmptyRequest& request,
                             std_srvs::EmptyResponse& response);
+  bool quitDriverService(std_srvs::EmptyRequest& request,
+                         std_srvs::EmptyResponse& response);
 
 private:
   ros::NodeHandle nh_, nh_private_;
@@ -63,6 +65,7 @@ private:
   std::mutex mutex_;
 
   std::atomic_bool hibernation_requested_;
+  std::atomic_bool quit_driver_;
 };
 
 #endif

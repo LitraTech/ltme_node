@@ -43,6 +43,11 @@ error_t DeviceBase::open()
   return session_->open(*location_);
 }
 
+bool DeviceBase::isOpened() const
+{
+  return session_->isOpened();
+}
+
 void DeviceBase::close()
 {
   session_->close();

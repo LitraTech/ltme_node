@@ -76,18 +76,20 @@ rapidjson::Document Session::createEmptyRequestObject()
 
 void Session::executeCommand(rapidjson::Document request)
 {
+  std::lock_guard<std::mutex> command_lock(command_mutex_);
   request.AddMember("id", ++id_, request.GetAllocator());
   transport_->transmitMessage(std::move(request));
 }
 
 error_t Session::executeCommand(rapidjson::Document request, rapidjson::Document& response)
 {
-  std::unique_lock<std::mutex> lock(response_queue_mutex_);
+  std::lock_guard<std::mutex> command_lock(command_mutex_);
+  std::unique_lock<std::mutex> response_queue_lock(response_queue_mutex_);
 
   request.AddMember("id", ++id_, request.GetAllocator());
   transport_->transmitMessage(std::move(request));
 
-  bool wait_result = response_queue_cv_.wait_for(lock, std::chrono::milliseconds(timeout_), [&]() {
+  bool wait_result = response_queue_cv_.wait_for(response_queue_lock, std::chrono::milliseconds(timeout_), [&]() {
     std::remove_if(response_queue_.begin(), response_queue_.end(), [&](const rapidjson::Document& document) {
       return (document["id"].GetInt() < id_);
     });
@@ -134,8 +136,8 @@ error_t Session::enableOobTransport(const Location& location)
 
 error_t Session::pollForScanBlock(rapidjson::Document& notification, std::vector<uint8_t>& oob_data)
 {
-  std::unique_lock<std::mutex> lock(scan_block_queue_mutex_);
-  bool wait_result = scan_block_queue_cv_.wait_for(lock, std::chrono::milliseconds(timeout_), [&]() {
+  std::unique_lock<std::mutex> scan_block_queue_lock(scan_block_queue_mutex_);
+  bool wait_result = scan_block_queue_cv_.wait_for(scan_block_queue_lock, std::chrono::milliseconds(timeout_), [&]() {
     return (scan_block_queue_primary_.size() > 0) || (scan_block_queue_oob_.size() > 0);
   });
   if (wait_result) {
@@ -160,7 +162,7 @@ void Session::onMessageReceived(rapidjson::Document message)
 
   if ((message.HasMember("result") || message.HasMember("error")) &&
       message.HasMember("id")) {
-    std::lock_guard<std::mutex> lock(response_queue_mutex_);
+    std::lock_guard<std::mutex> response_queue_lock(response_queue_mutex_);
     if (message["id"] == id_) {
       response_queue_.clear();
       response_queue_.push_back(std::move(message));
@@ -169,7 +171,7 @@ void Session::onMessageReceived(rapidjson::Document message)
   }
   else if ((message.HasMember("method") && message["method"] == "notification/laserScan") &&
            message.HasMember("params") && !message.HasMember("id")) {
-    std::lock_guard<std::mutex> lock(scan_block_queue_mutex_);
+    std::lock_guard<std::mutex> scan_block_queue_lock(scan_block_queue_mutex_);
     if (scan_block_queue_primary_.size() == SCAN_BLOCK_BUFFERING_COUNT)
       scan_block_queue_primary_.pop_front();
     scan_block_queue_primary_.push_back(std::move(message));
@@ -179,7 +181,7 @@ void Session::onMessageReceived(rapidjson::Document message)
 
 void Session::onOobPacketReceived(std::vector<uint8_t> oob_packet)
 {
-  std::lock_guard<std::mutex> lock(scan_block_queue_mutex_);
+  std::lock_guard<std::mutex> scan_block_queue_lock(scan_block_queue_mutex_);
   if (scan_block_queue_oob_.size() == SCAN_BLOCK_BUFFERING_COUNT)
     scan_block_queue_oob_.pop_front();
   scan_block_queue_oob_.push_back(std::move(oob_packet));

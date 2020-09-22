@@ -270,20 +270,20 @@ error_t Device::readScanBlock(ScanBlock& scan_block)
 
       switch (block_length) {
         case LASER_SCAN_BLOCK_LENGTH_10HZ:
-          ranges = oob_packet->payload_10hz.ranges;
-          intensities = oob_packet->payload_10hz.intensities;
+          ranges = oob_packet->payload.data_10hz.ranges;
+          intensities = oob_packet->payload.data_10hz.intensities;
           break;
         case LASER_SCAN_BLOCK_LENGTH_15HZ:
-          ranges = oob_packet->payload_15hz.ranges;
-          intensities = oob_packet->payload_15hz.intensities;
+          ranges = oob_packet->payload.data_15hz.ranges;
+          intensities = oob_packet->payload.data_15hz.intensities;
           break;
         case LASER_SCAN_BLOCK_LENGTH_20HZ:
-          ranges = oob_packet->payload_20hz.ranges;
-          intensities = oob_packet->payload_20hz.intensities;
+          ranges = oob_packet->payload.data_20hz.ranges;
+          intensities = oob_packet->payload.data_20hz.intensities;
           break;
-        case LASER_SCAN_BLOCK_LENGTH_25HZ_30hz:
-          ranges = oob_packet->payload_25hz_30hz.ranges;
-          intensities = oob_packet->payload_25hz_30hz.intensities;
+        case LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ:
+          ranges = oob_packet->payload.data_25hz_30hz.ranges;
+          intensities = oob_packet->payload.data_25hz_30hz.intensities;
           break;
       }
 
@@ -512,6 +512,13 @@ error_t Device::persistSettings()
   error_t result = session_->executeCommand(std::move(request), response);
 
   return result;
+}
+
+void Device::rebootToBootloader()
+{
+  rapidjson::Document request = session_->createEmptyRequestObject();
+  request["method"].SetString("device/rebootToBootloader");
+  session_->executeCommand(std::move(request));
 }
 
 }

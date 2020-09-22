@@ -18,6 +18,7 @@ const int LidarDriver::DEFAULT_AVERAGE_FACTOR = 1;
 LidarDriver::LidarDriver()
   : nh_private_("~")
   , hibernation_requested_(false)
+  , quit_driver_(false)
 {
   if (!nh_private_.getParam("device_model", device_model_)) {
     ROS_ERROR("Missing required parameter \"device_model\"");
@@ -92,6 +93,8 @@ void LidarDriver::run()
     ("request_hibernation", std::bind(&LidarDriver::requestHibernationService, this, std::placeholders::_1, std::placeholders::_2));
   ros::ServiceServer request_wake_up_service = nh_private_.advertiseService<std_srvs::EmptyRequest, std_srvs::EmptyResponse>
     ("request_wake_up", std::bind(&LidarDriver::requestWakeUpService, this, std::placeholders::_1, std::placeholders::_2));
+  ros::ServiceServer quit_driver_service = nh_private_.advertiseService<std_srvs::EmptyRequest, std_srvs::EmptyResponse>
+    ("quit_driver", std::bind(&LidarDriver::quitDriverService, this, std::placeholders::_1, std::placeholders::_2));
 
   ros::AsyncSpinner spinner(1);
   spinner.start();
@@ -122,7 +125,7 @@ void LidarDriver::run()
   device_ = std::unique_ptr<ldcp_sdk::Device>(new ldcp_sdk::Device(location));
 
   ros::Rate loop_rate(0.3);
-  while (nh_.ok()) {
+  while (nh_.ok() && !quit_driver_.load()) {
     if (device_->open() == ldcp_sdk::no_error) {
       hibernation_requested_ = false;
 
@@ -217,7 +220,7 @@ void LidarDriver::run()
           }
         };
 
-        while (nh_.ok()) {
+        while (nh_.ok() && !quit_driver_.load()) {
           laser_scan.ranges.resize(beam_index_max - beam_index_min + 1);
           laser_scan.intensities.resize(beam_index_max - beam_index_min + 1);
 
@@ -365,6 +368,13 @@ bool LidarDriver::requestWakeUpService(std_srvs::EmptyRequest& request,
     return true;
   }
   return false;
+}
+
+bool LidarDriver::quitDriverService(std_srvs::EmptyRequest& request,
+                                    std_srvs::EmptyResponse& response)
+{
+  quit_driver_ = true;
+  return true;
 }
 
 int main(int argc, char* argv[])

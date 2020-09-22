@@ -48,6 +48,8 @@ public:
   error_t setOobTargetAddress(in_addr_t address);
   error_t setOobTargetPort(in_port_t port);
   error_t persistSettings();
+
+  void rebootToBootloader();
 };
 
 }

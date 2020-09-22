@@ -26,7 +26,7 @@ public:
 const int LASER_SCAN_BLOCK_LENGTH_10HZ = 288;
 const int LASER_SCAN_BLOCK_LENGTH_15HZ = 192;
 const int LASER_SCAN_BLOCK_LENGTH_20HZ = 144;
-const int LASER_SCAN_BLOCK_LENGTH_25HZ_30hz = 96;
+const int LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ = 96;
 
 #pragma pack(push, 1)
 struct OobPacket
@@ -43,20 +43,20 @@ struct OobPacket
     struct {
       uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_10HZ];
       uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_10HZ];
-    } payload_10hz;
+    } data_10hz;
     struct {
       uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_15HZ];
       uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_15HZ];
-    } payload_15hz;
+    } data_15hz;
     struct {
       uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_20HZ];
       uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_20HZ];
-    } payload_20hz;
+    } data_20hz;
     struct {
-      uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_25HZ_30hz];
-      uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_25HZ_30hz];
-    } payload_25hz_30hz;
-  };
+      uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ];
+      uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ];
+    } data_25hz_30hz;
+  } payload;
 };
 #pragma pack(pop)
 

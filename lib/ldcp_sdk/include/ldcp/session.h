@@ -46,6 +46,8 @@ private:
   std::unique_ptr<Transport> transport_;
 
   int id_;
+  std::mutex command_mutex_;
+
   std::deque<rapidjson::Document> response_queue_;
   std::mutex response_queue_mutex_;
   std::condition_variable response_queue_cv_;
