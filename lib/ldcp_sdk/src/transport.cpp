@@ -43,14 +43,15 @@ private:
 
   asio::io_service io_service_;
 
-  asio::ip::tcp::endpoint device_address_;
   asio::ip::tcp::socket primary_socket_;
+  asio::ip::tcp::endpoint device_address_;
 
   asio::streambuf incoming_message_buffer_;
   asio::streambuf outgoing_message_buffers_[3];
   std::deque<rapidjson::Document> outgoing_message_queue_;
 
   asio::ip::udp::socket oob_socket_;
+  asio::ip::udp::endpoint sender_address_;
 
   std::array<uint8_t, OOB_PACKET_LENGTH_MAX> oob_packet_buffer_;
 };
@@ -147,6 +148,7 @@ void NetworkTransport::transmitMessage(rapidjson::Document message)
 error_t NetworkTransport::enableOob(const Location& location)
 {
   oob_socket_.open(asio::ip::udp::v4());
+  oob_socket_.set_option(asio::ip::udp::socket::reuse_address(true));
 
   const NetworkLocation& network_location = dynamic_cast<const NetworkLocation&>(location);
   asio::ip::udp::endpoint local_address(asio::ip::address_v4(ntohl(network_location.address())),
@@ -155,9 +157,10 @@ error_t NetworkTransport::enableOob(const Location& location)
   oob_socket_.bind(local_address, bind_result);
 
   if (!bind_result) {
-    oob_socket_.async_receive(asio::buffer(oob_packet_buffer_),
-                              std::bind(&NetworkTransport::oobPacketHandler,
-                                        this, std::placeholders::_1, std::placeholders::_2));
+    oob_socket_.async_receive_from(asio::buffer(oob_packet_buffer_),
+                                   sender_address_,
+                                   std::bind(&NetworkTransport::oobPacketHandler,
+                                             this, std::placeholders::_1, std::placeholders::_2));
     return error_t::no_error;
   }
   else {
@@ -214,16 +217,19 @@ void NetworkTransport::outgoingMessageHandler(const asio::error_code& error, siz
 void NetworkTransport::oobPacketHandler(const asio::error_code& error, size_t bytes_transferred)
 {
   if (!error) {
-    if (received_oob_packet_callback_) {
+    if ((sender_address_.address() == device_address_.address() &&
+         sender_address_.port() == device_address_.port()) &&
+        received_oob_packet_callback_) {
       if (verifyOobPacket(oob_packet_buffer_.data(), bytes_transferred)) {
         std::vector<uint8_t> oob_data(oob_packet_buffer_.data(),
                                       oob_packet_buffer_.data() + bytes_transferred);
         received_oob_packet_callback_(std::move(oob_data));
       }
     }
-    oob_socket_.async_receive(asio::buffer(oob_packet_buffer_),
-                              std::bind(&NetworkTransport::oobPacketHandler,
-                                        this, std::placeholders::_1, std::placeholders::_2));
+    oob_socket_.async_receive_from(asio::buffer(oob_packet_buffer_),
+                                   sender_address_,
+                                   std::bind(&NetworkTransport::oobPacketHandler,
+                                             this, std::placeholders::_1, std::placeholders::_2));
   }
 }
 
