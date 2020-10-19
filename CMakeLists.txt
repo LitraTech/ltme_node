@@ -19,6 +19,8 @@ add_service_files(
     QuerySerial.srv
     QueryFirmwareVersion.srv
     QueryHardwareVersion.srv
+    GetBackgroundIntensityThreshold.srv
+    SetBackgroundIntensityThreshold.srv
 )
 
 generate_messages(

@@ -45,6 +45,10 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 
 `~request_wake_up` ([std_srvs/Empty](http://docs.ros.org/api/std_srvs/html/srv/Empty.html)): Exit standby mode and resume normal operation.
 
+`~get_background_intensity_threshold` ([std_srvs/Empty](http://docs.ros.org/api/std_srvs/html/srv/Empty.html)): Returns currently active value of background intensity threshold. Before making a distance measurement, the sensor samples background light intensity and returns an invalid result if intensity value exceeds the threshold.
+
+`~set_background_intensity_threshold` ([ltme_node/SetBackgroundIntensityThreshold]): Sets value for background intensity threshold. Valid values are between 0 and 4095 inclusive. Higher threshold value means toleration to more intense background light (at the cost of greater possibillity of phantom echo), and a value of 4095 completely disables background light intensity check.
+
 `~quit_driver` ([std_srvs/Empty](http://docs.ros.org/api/std_srvs/html/srv/Empty.html)): Instructs the driver to quit its process. This service can be handy when updating device firmware, as LDCP only allows one connection at a time, and the driver has to be terminated before running the updater.
 
 ### Parameters
@@ -77,6 +81,8 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 `~range_min` and `~range_max` (float, default: 0.05 and 30): Minimum and maximum range value of published laser scans. Range values out of these bounds should be ignored.
 
 `~average_factor` (integer, default: 1): Number of neighboring measurements to be combined and averaged. Only integers &ge; 1 and &le; 8 are allowed. Averaging reduces jitter but angular resolution will also decrease by the same factor.
+
+`~background_intensity_threshold` (integer, default: 256): Threshold value of tolerated background light intensity. Only integers &ge; 0 and &le; 4095 are allowed.
 
 # Utilities
 

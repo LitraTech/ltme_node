@@ -49,6 +49,9 @@ public:
   error_t setOobTargetPort(in_port_t port);
   error_t persistSettings();
 
+  error_t getBackgroundIntensityThreshold(int& threshold);
+  error_t setBackgroundIntensityThreshold(int threshold);
+
   void rebootToBootloader();
 };
 

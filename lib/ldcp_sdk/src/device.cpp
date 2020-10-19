@@ -514,6 +514,40 @@ error_t Device::persistSettings()
   return result;
 }
 
+error_t Device::getBackgroundIntensityThreshold(int& threshold)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "rangefinder.backgroundIntensityThreshold", allocator), allocator);
+  request.AddMember("vendor", true, allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+  if (result == error_t::no_error)
+    threshold = response["result"].GetInt();
+
+  return result;
+}
+
+error_t Device::setBackgroundIntensityThreshold(int threshold)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "rangefinder.backgroundIntensityThreshold", allocator)
+                      .AddMember("value", threshold, allocator),
+                    allocator);
+  request.AddMember("vendor", true, allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
 void Device::rebootToBootloader()
 {
   rapidjson::Document request = session_->createEmptyRequestObject();

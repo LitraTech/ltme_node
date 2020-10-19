@@ -14,6 +14,7 @@ const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MAX = -3.142;
 const double LidarDriver::RANGE_MIN_LIMIT = 0.05;
 const double LidarDriver::RANGE_MAX_LIMIT = 30;
 const int LidarDriver::DEFAULT_AVERAGE_FACTOR = 1;
+const int LidarDriver::DEFAULT_BACKGROUND_INTENSITY_THRESHOLD = 256;
 
 LidarDriver::LidarDriver()
   : nh_private_("~")
@@ -38,6 +39,7 @@ LidarDriver::LidarDriver()
   nh_private_.param<double>("range_min", range_min_, RANGE_MIN_LIMIT);
   nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT);
   nh_private_.param<int>("average_factor", average_factor_, DEFAULT_AVERAGE_FACTOR);
+  nh_private_.param<int>("background_intensity_threshold", background_intensity_threshold_, DEFAULT_BACKGROUND_INTENSITY_THRESHOLD);
 
   if (!(enforced_transport_mode_ == "none" || enforced_transport_mode_ == "normal" || enforced_transport_mode_ == "oob")) {
     ROS_ERROR("Transport mode \"%s\" not supported", enforced_transport_mode_.c_str());
@@ -76,6 +78,10 @@ LidarDriver::LidarDriver()
     ROS_ERROR("average_factor is set to %d while its valid value is between 1 and 8", average_factor_);
     exit(-1);
   }
+  if (background_intensity_threshold_ < 0 || background_intensity_threshold_ > 4095) {
+    ROS_ERROR("background_intensity_threshold is set to %d while its valid value is between 0 and 4095", background_intensity_threshold_);
+    exit(-1);
+  }
 }
 
 void LidarDriver::run()
@@ -93,6 +99,10 @@ void LidarDriver::run()
     ("request_hibernation", std::bind(&LidarDriver::requestHibernationService, this, std::placeholders::_1, std::placeholders::_2));
   ros::ServiceServer request_wake_up_service = nh_private_.advertiseService<std_srvs::EmptyRequest, std_srvs::EmptyResponse>
     ("request_wake_up", std::bind(&LidarDriver::requestWakeUpService, this, std::placeholders::_1, std::placeholders::_2));
+  ros::ServiceServer get_background_intensity_threshold_service = nh_private_.advertiseService<ltme_node::GetBackgroundIntensityThresholdRequest, ltme_node::GetBackgroundIntensityThresholdResponse>
+    ("get_background_intensity_threshold", std::bind(&LidarDriver::getBackgroundIntensityThresholdService, this, std::placeholders::_1, std::placeholders::_2));
+  ros::ServiceServer set_background_intensity_threshold_service = nh_private_.advertiseService<ltme_node::SetBackgroundIntensityThresholdRequest, ltme_node::SetBackgroundIntensityThresholdResponse>
+    ("set_background_intensity_threshold", std::bind(&LidarDriver::setBackgroundIntensityThresholdService, this, std::placeholders::_1, std::placeholders::_2));
   ros::ServiceServer quit_driver_service = nh_private_.advertiseService<std_srvs::EmptyRequest, std_srvs::EmptyResponse>
     ("quit_driver", std::bind(&LidarDriver::quitDriverService, this, std::placeholders::_1, std::placeholders::_2));
 
@@ -168,6 +178,9 @@ void LidarDriver::run()
           if (device_->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
             ROS_WARN("Unable to query device for scan frequency and will use %d as the frequency value", scan_frequency);
         }
+
+        if (device_->setBackgroundIntensityThreshold(background_intensity_threshold_) != ldcp_sdk::no_error)
+          ROS_WARN("Unable to set background intensity threshold");
 
         device_->startMeasurement();
         device_->startStreaming();
@@ -366,6 +379,35 @@ bool LidarDriver::requestWakeUpService(std_srvs::EmptyRequest& request,
   if (lock.owns_lock()) {
     hibernation_requested_ = false;
     return true;
+  }
+  return false;
+}
+
+bool LidarDriver::getBackgroundIntensityThresholdService(ltme_node::GetBackgroundIntensityThresholdRequest& request,
+                                                         ltme_node::GetBackgroundIntensityThresholdResponse& response)
+{
+  std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+  if (lock.owns_lock()) {
+    int background_intensity_threshold;
+    if (device_->getBackgroundIntensityThreshold(background_intensity_threshold) == ldcp_sdk::no_error) {
+      response.background_intensity_threshold = background_intensity_threshold;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool LidarDriver::setBackgroundIntensityThresholdService(ltme_node::SetBackgroundIntensityThresholdRequest& request,
+                                                         ltme_node::SetBackgroundIntensityThresholdResponse& response)
+{
+  int background_intensity_threshold = request.background_intensity_threshold;
+  if (background_intensity_threshold < 0 || background_intensity_threshold > 4095)
+    return false;
+
+  std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+  if (lock.owns_lock()) {
+    if (device_->setBackgroundIntensityThreshold(background_intensity_threshold) == ldcp_sdk::no_error)
+      return true;
   }
   return false;
 }
