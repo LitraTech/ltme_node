@@ -31,7 +31,6 @@ LidarDriver::LidarDriver()
   }
   nh_private_.param<std::string>("enforced_transport_mode", enforced_transport_mode_, DEFAULT_ENFORCED_TRANSPORT_MODE);
   nh_private_.param<std::string>("frame_id", frame_id_, DEFAULT_FRAME_ID);
-  nh_private_.param<int>("scan_frequency_override", scan_frequency_override_, 0);
   nh_private_.param<double>("angle_min", angle_min_, ANGLE_MIN_LIMIT);
   nh_private_.param<double>("angle_max", angle_max_, ANGLE_MAX_LIMIT);
   nh_private_.param<double>("angle_excluded_min", angle_excluded_min_, DEFAULT_ANGLE_EXCLUDED_MIN);
@@ -43,11 +42,6 @@ LidarDriver::LidarDriver()
 
   if (!(enforced_transport_mode_ == "none" || enforced_transport_mode_ == "normal" || enforced_transport_mode_ == "oob")) {
     ROS_ERROR("Transport mode \"%s\" not supported", enforced_transport_mode_.c_str());
-    exit(-1);
-  }
-  if (scan_frequency_override_ != 0 &&
-    (scan_frequency_override_ < 10 || scan_frequency_override_ > 30 || scan_frequency_override_ % 5 != 0)) {
-    ROS_ERROR("Scan frequency %d not supported", scan_frequency_override_);
     exit(-1);
   }
   if (!(angle_min_ < angle_max_)) {
@@ -172,12 +166,8 @@ void LidarDriver::run()
 
       if (!reboot_required) {
         int scan_frequency = DEFAULT_SCAN_FREQUENCY;
-        if (scan_frequency_override_ != 0)
-          scan_frequency = scan_frequency_override_;
-        else {
-          if (device_->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
-            ROS_WARN("Unable to query device for scan frequency and will use %d as the frequency value", scan_frequency);
-        }
+        if (device_->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
+          ROS_WARN("Unable to query device for scan frequency and will use %d as the frequency value", scan_frequency);
 
         if (device_->setBackgroundIntensityThreshold(background_intensity_threshold_) != ldcp_sdk::no_error)
           ROS_WARN("Unable to set background intensity threshold");

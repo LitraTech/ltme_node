@@ -59,7 +59,6 @@ private:
   std::string device_address_;
   std::string enforced_transport_mode_;
   std::string frame_id_;
-  int scan_frequency_override_;
   double angle_min_;
   double angle_max_;
   double angle_excluded_min_;
