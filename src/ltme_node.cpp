@@ -5,6 +5,7 @@
 #include <sensor_msgs/LaserScan.h>
 
 const std::string LidarDriver::DEFAULT_ENFORCED_TRANSPORT_MODE = "none";
+const int LidarDriver::DEFAULT_ENFORCED_SCAN_FREQUENCY = 0;
 const std::string LidarDriver::DEFAULT_FRAME_ID = "laser";
 const int LidarDriver::DEFAULT_SCAN_FREQUENCY = 15;
 const double LidarDriver::ANGLE_MIN_LIMIT = -2.356;
@@ -30,6 +31,7 @@ LidarDriver::LidarDriver()
     exit(-1);
   }
   nh_private_.param<std::string>("enforced_transport_mode", enforced_transport_mode_, DEFAULT_ENFORCED_TRANSPORT_MODE);
+  nh_private_.param<int>("enforced_scan_frequency", enforced_scan_frequency_, DEFAULT_ENFORCED_SCAN_FREQUENCY);
   nh_private_.param<std::string>("frame_id", frame_id_, DEFAULT_FRAME_ID);
   nh_private_.param<double>("angle_min", angle_min_, ANGLE_MIN_LIMIT);
   nh_private_.param<double>("angle_max", angle_max_, ANGLE_MAX_LIMIT);
@@ -42,6 +44,11 @@ LidarDriver::LidarDriver()
 
   if (!(enforced_transport_mode_ == "none" || enforced_transport_mode_ == "normal" || enforced_transport_mode_ == "oob")) {
     ROS_ERROR("Transport mode \"%s\" not supported", enforced_transport_mode_.c_str());
+    exit(-1);
+  }
+  if (!(enforced_scan_frequency_ == 0 || enforced_scan_frequency_ == 10 || enforced_scan_frequency_ == 15 ||
+    enforced_scan_frequency_ == 20 || enforced_scan_frequency_ == 25 || enforced_scan_frequency_ == 30)) {
+    ROS_ERROR("Scan frequency %d not supported (valid options are: 10, 15, 20, 25 and 30)", enforced_scan_frequency_);
     exit(-1);
   }
   if (!(angle_min_ < angle_max_)) {
@@ -164,11 +171,19 @@ void LidarDriver::run()
           ROS_WARN("Unable to query device for firmware version, \"enforced_transport_mode\" parameter will be ignored");
       }
 
-      if (!reboot_required) {
-        int scan_frequency = DEFAULT_SCAN_FREQUENCY;
-        if (device_->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
-          ROS_WARN("Unable to query device for scan frequency and will use %d as the frequency value", scan_frequency);
+      int scan_frequency = DEFAULT_SCAN_FREQUENCY;
+      if (device_->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
+        ROS_WARN("Unable to query device for scan frequency and will use %d as the frequency value", scan_frequency);
+      else if (enforced_scan_frequency_ != 0) {
+        if (scan_frequency != enforced_scan_frequency_) {
+          ROS_INFO("Scan frequency will be changed to %d Hz", enforced_scan_frequency_);
+          device_->setScanFrequency(enforced_scan_frequency_);
+          device_->persistSettings();
+          reboot_required = true;
+        }
+      }
 
+      if (!reboot_required) {
         if (device_->setBackgroundIntensityThreshold(background_intensity_threshold_) != ldcp_sdk::no_error)
           ROS_WARN("Unable to set background intensity threshold");
 

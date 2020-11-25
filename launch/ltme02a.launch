@@ -13,6 +13,13 @@
     <!-- * oob: enforce out-of-band mode, where data are streamed through a dedicated UDP channel -->
     <!-- <param name="enforced_transport_mode" value="none"/> -->
 
+    <!-- Enforce the device to scan at specified frequency. -->
+    <!-- Available options are: 0 (disable scan frequency enforcement), 10, 15, 20, 25 and 30. -->
+    <!-- If this option is enabled (i.e., set to a non-zero value), and the device is running at a different frequency, -->
+    <!-- the enforced value will be set (and saved in non-volatile memory) as new frequency; -->
+    <!-- then the device will be rebooted for once for the new settings to take effect. -->
+    <!-- <param name="enforced_scan_frequency" value="0"/> -->
+
     <!-- Frame ID used by the published LaserScan messages -->
     <!-- <param name="frame_id" value="laser"/> -->
 

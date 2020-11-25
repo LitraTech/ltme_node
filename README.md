@@ -47,7 +47,7 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 
 `~get_background_intensity_threshold` ([std_srvs/Empty](http://docs.ros.org/api/std_srvs/html/srv/Empty.html)): Returns currently active value of background intensity threshold. Before making a distance measurement, the sensor samples background light intensity and returns an invalid result if intensity value exceeds the threshold.
 
-`~set_background_intensity_threshold` ([ltme_node/SetBackgroundIntensityThreshold]): Sets value for background intensity threshold. Valid values are between 0 and 4095 inclusive. Higher threshold value means toleration to more intense background light (at the cost of greater possibillity of phantom echo), and a value of 4095 completely disables background light intensity check.
+`~set_background_intensity_threshold` ([ltme_node/SetBackgroundIntensityThreshold]): Sets value for background intensity threshold. Valid values are between 0 and 4095 inclusive. Higher threshold value means toleration to more intense background light (at the cost of greater possibility of phantom echo), and a value of 4095 completely disables background light intensity check.
 
 `~quit_driver` ([std_srvs/Empty](http://docs.ros.org/api/std_srvs/html/srv/Empty.html)): Instructs the driver to quit its process. This service can be handy when updating device firmware, as LDCP only allows one connection at a time, and the driver has to be terminated before running the updater.
 
@@ -70,17 +70,19 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 > <p>In order to support communication interfaces lacking multiplexed connections (serial interfaces in particular), LDCP was initially designed around a shared connection model. In this model, command interactions and measurement data are encapsulated in JSON-style messages and transmitted through the same underlying connection. For the receiver part, it has to parse received JSON messages and extract encoded binary data, which may have adverse impact on performance for systems under heavy load.
 > <p>To solve this problem, later iteration of LDCP introduced a new out-of-band (OOB) transport mode. For supported interfaces, this mode creates a separate (out-of-band) communication channel and uses this channel to stream measurements in binary form, making it much easier for the receiver to process. For example, if OOB mode is enabled for Ethernet capable devices (such as LTME-02A), command interactions will be transmitted over a TCP connection, while measurement data are streamed through a dedicated UDP channel.
 
+`~enforced_scan_frequency` (integer, default: 0) *[Optional]*: Enforce the device to scan at specified frequency. Valid values are: 0 (disable scan frequency enforcement), 10, 15, 20, 25 and 30. If this option is enabled (i.e., set to non-zero), and the device is running at a different frequency, then the enforced value will be set (and saved in non-volatile memory) as new scan frequency, and the device will be rebooted for once for the updated settings to take effect.
+
 `~frame_id` (string, default: "laser") *[Optional]*: Frame ID of published LaserScan messages.
 
-`~angle_min` and `~angle_max` (float, default: -2.356 and 2.356): Start and end angle of published laser scans (in radians). As LTME series devices have an FOV of 270 degrees, the minimum allowed value for `angle_min` is -2.356 (about -3 * pi / 4), and the maximum allowed value for `angle_max` is 2.356 (about 3 * pi / 4).
+`~angle_min` and `~angle_max` (float, default: -2.356 and 2.356) *[Optional]*: Start and end angle of published laser scans (in radians). As LTME series devices have an FOV of 270 degrees, the minimum allowed value for `angle_min` is -2.356 (about -3 * pi / 4), and the maximum allowed value for `angle_max` is 2.356 (about 3 * pi / 4).
 
-`~angle_excluded_min` and `~angle_excluded_max` (float, default: -3.142 and -3.142): Range of angle (in radians) for which data should be excluded from published laser scans. Leave these two parameters commented out if a full 270-degree FOV is desired.
+`~angle_excluded_min` and `~angle_excluded_max` (float, default: -3.142 and -3.142) *[Optional]*: Range of angle (in radians) for which data should be excluded from published laser scans. Leave these two parameters commented out if a full 270-degree FOV is desired.
 
-`~range_min` and `~range_max` (float, default: 0.05 and 30): Minimum and maximum range value of published laser scans. Range values out of these bounds should be ignored.
+`~range_min` and `~range_max` (float, default: 0.05 and 30) *[Optional]*: Minimum and maximum range value of published laser scans. Range values out of these bounds should be ignored.
 
-`~average_factor` (integer, default: 1): Number of neighboring measurements to be combined and averaged. Only integers &ge; 1 and &le; 8 are allowed. Averaging reduces jitter but angular resolution will also decrease by the same factor.
+`~average_factor` (integer, default: 1) *[Optional]*: Number of neighboring measurements to be combined and averaged. Only integers &ge; 1 and &le; 8 are allowed. Averaging reduces jitter but angular resolution will also decrease by the same factor.
 
-`~background_intensity_threshold` (integer, default: 256): Threshold value of tolerated background light intensity. Only integers &ge; 0 and &le; 4095 are allowed.
+`~background_intensity_threshold` (integer, default: 256) *[Optional]*: Threshold value of tolerated background light intensity. Only integers &ge; 0 and &le; 4095 are allowed.
 
 # Utilities
 
