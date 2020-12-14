@@ -74,6 +74,8 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 
 `~frame_id` (string, default: "laser") *[Optional]*: Frame ID of published LaserScan messages.
 
+`~invert_frame` (bool, default: "false") *[Optional]*: If this option is enabled, published LaserScan messages will have their X and Z axes inverted. This is mostly useful when the device is mounted upside down, as it effectively undos the inversion created by the mounting, and makes it look like the scans are from a device installed in a normal, upward direction.
+
 `~angle_min` and `~angle_max` (float, default: -2.356 and 2.356) *[Optional]*: Start and end angle of published laser scans (in radians). As LTME series devices have an FOV of 270 degrees, the minimum allowed value for `angle_min` is -2.356 (about -3 * pi / 4), and the maximum allowed value for `angle_max` is 2.356 (about 3 * pi / 4).
 
 `~angle_excluded_min` and `~angle_excluded_max` (float, default: -3.142 and -3.142) *[Optional]*: Range of angle (in radians) for which data should be excluded from published laser scans. Leave these two parameters commented out if a full 270-degree FOV is desired.

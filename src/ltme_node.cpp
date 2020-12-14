@@ -7,6 +7,7 @@
 const std::string LidarDriver::DEFAULT_ENFORCED_TRANSPORT_MODE = "none";
 const int LidarDriver::DEFAULT_ENFORCED_SCAN_FREQUENCY = 0;
 const std::string LidarDriver::DEFAULT_FRAME_ID = "laser";
+const bool LidarDriver::DEFAULT_INVERT_FRAME = false;
 const int LidarDriver::DEFAULT_SCAN_FREQUENCY = 15;
 const double LidarDriver::ANGLE_MIN_LIMIT = -2.356;
 const double LidarDriver::ANGLE_MAX_LIMIT = 2.356;
@@ -33,6 +34,7 @@ LidarDriver::LidarDriver()
   nh_private_.param<std::string>("enforced_transport_mode", enforced_transport_mode_, DEFAULT_ENFORCED_TRANSPORT_MODE);
   nh_private_.param<int>("enforced_scan_frequency", enforced_scan_frequency_, DEFAULT_ENFORCED_SCAN_FREQUENCY);
   nh_private_.param<std::string>("frame_id", frame_id_, DEFAULT_FRAME_ID);
+  nh_private_.param<bool>("invert_frame", invert_frame_, DEFAULT_INVERT_FRAME);
   nh_private_.param<double>("angle_min", angle_min_, ANGLE_MIN_LIMIT);
   nh_private_.param<double>("angle_max", angle_max_, ANGLE_MAX_LIMIT);
   nh_private_.param<double>("angle_excluded_min", angle_excluded_min_, DEFAULT_ANGLE_EXCLUDED_MIN);
@@ -222,7 +224,8 @@ void LidarDriver::run()
         auto updateLaserScan = [&](const ldcp_sdk::ScanBlock& scan_block) {
           int block_size = scan_block.layers[0].ranges.size();
           for (int i = 0; i < block_size; i++) {
-            int beam_index = block_size * (scan_block.block_id - 4) + i;
+            int beam_index = (!invert_frame_) ? block_size * (scan_block.block_id - 4) + i :
+                                                block_size * ((7 - scan_block.block_id) - 4) + (block_size - i - 1);
             if (beam_index < beam_index_min || beam_index > beam_index_max)
               continue;
             if (beam_index >= beam_index_excluded_min && beam_index <= beam_index_excluded_max)

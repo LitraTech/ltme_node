@@ -21,6 +21,7 @@ public:
   const static std::string DEFAULT_ENFORCED_TRANSPORT_MODE;
   const static int DEFAULT_ENFORCED_SCAN_FREQUENCY;
   const static std::string DEFAULT_FRAME_ID;
+  const static bool DEFAULT_INVERT_FRAME;
   const static int DEFAULT_SCAN_FREQUENCY;
   const static double ANGLE_MIN_LIMIT;
   const static double ANGLE_MAX_LIMIT;
@@ -61,6 +62,7 @@ private:
   std::string enforced_transport_mode_;
   int enforced_scan_frequency_;
   std::string frame_id_;
+  bool invert_frame_;
   double angle_min_;
   double angle_max_;
   double angle_excluded_min_;
