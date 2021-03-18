@@ -6,6 +6,7 @@ option(BUILD_DEVICE_MANAGER "Build device manager" OFF)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   add_compile_options(-std=c++11)
+  add_compile_options(-fvisibility=hidden)
 endif()
 
 set(SDK_SRC_DIR "src")
@@ -29,10 +30,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
 
 target_include_directories(${PROJECT_NAME}
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
-  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/Asio/asio-1.12.1/include"
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/Asio/asio-1.18.0/include"
   PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/RapidJSON/rapidjson-1.1.0/include"
 )
-add_definitions(-DASIO_STANDALONE=1)
+add_definitions(-DASIO_DISABLE_VISIBILITY)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(SDK_LIB_DEPS pthread)
