@@ -78,6 +78,8 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 
 `~average_factor` (integer, default: 1): Number of neighboring measurements to be combined and averaged. Only integers &ge; 1 and &le; 8 are allowed. Averaging reduces jitter but angular resolution will also decrease by the same factor.
 
+`~shadow_filter_strength` (integer, default: 50): Indicates how data post-processing stage will filter scan artifacts caused by veiling effect. This effect usually occurs when the edge of an object is scanned and manifests itself in the form of a series of points spreading out along the ray direction. Only integers &ge; 0 and &le; 100 are allowed. Larger value leads to more aggressive filtering.
+
 # Utilities
 
 ## update_firmware

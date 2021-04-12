@@ -40,5 +40,9 @@
     <!-- Number of neighboring measurements to be averaged -->
     <!-- Averaging reduces jitter but angular resolution will also decrease by the same factor -->
     <!-- <param name="average_factor" value="2"/> -->
+
+    <!-- Adjust how data post-processing stage will filter scan artifacts caused by veiling effect -->
+    <!-- Valid range is between 0 and 100 inclusive, larger value leads to more aggressive filtering -->
+    <!-- <param name="shadow_filter_strength" value="50"/> -->
   </node>
 </launch>

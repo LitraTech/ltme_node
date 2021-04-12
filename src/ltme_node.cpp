@@ -14,6 +14,7 @@ const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MAX = -3.142;
 const double LidarDriver::RANGE_MIN_LIMIT = 0.05;
 const double LidarDriver::RANGE_MAX_LIMIT = 30;
 const int LidarDriver::DEFAULT_AVERAGE_FACTOR = 1;
+const int LidarDriver::DEFAULT_SHADOW_FILTER_STRENGTH = 50;
 
 LidarDriver::LidarDriver()
   : nh_private_("~")
@@ -38,6 +39,7 @@ LidarDriver::LidarDriver()
   nh_private_.param<double>("range_min", range_min_, RANGE_MIN_LIMIT);
   nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT);
   nh_private_.param<int>("average_factor", average_factor_, DEFAULT_AVERAGE_FACTOR);
+  nh_private_.param<int>("shadow_filter_strength", shadow_filter_strength_, DEFAULT_SHADOW_FILTER_STRENGTH);
 
   if (!(enforced_transport_mode_ == "none" || enforced_transport_mode_ == "normal" || enforced_transport_mode_ == "oob")) {
     ROS_ERROR("Transport mode \"%s\" not supported", enforced_transport_mode_.c_str());
@@ -74,6 +76,10 @@ LidarDriver::LidarDriver()
   }
   if (average_factor_ <= 0 || average_factor_ > 8) {
     ROS_ERROR("average_factor is set to %d while its valid value is between 1 and 8", average_factor_);
+    exit(-1);
+  }
+  if (shadow_filter_strength_ < 0 || average_factor_ > 100) {
+    ROS_ERROR("shadow_filter_strength is set to %d while its valid value is between 0 and 100 (inclusive)", shadow_filter_strength_);
     exit(-1);
   }
 }
@@ -167,6 +173,13 @@ void LidarDriver::run()
         else {
           if (device_->getScanFrequency(scan_frequency) != ldcp_sdk::no_error)
             ROS_WARN("Unable to query device for scan frequency and will use %d as the frequency value", scan_frequency);
+        }
+
+        if (shadow_filter_strength_ != DEFAULT_SHADOW_FILTER_STRENGTH) {
+          if (device_->setShadowFilterStrength(shadow_filter_strength_) == ldcp_sdk::no_error)
+            ROS_INFO("Shadow filter strength set to %d", shadow_filter_strength_);
+          else
+            ROS_WARN("Unable to set shadow filter strength");
         }
 
         device_->startMeasurement();
