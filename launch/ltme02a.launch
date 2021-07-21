@@ -44,5 +44,10 @@
     <!-- Adjust how data post-processing stage will filter scan artifacts caused by veiling effect -->
     <!-- Valid range is between 0 and 100 inclusive, larger value leads to more aggressive filtering -->
     <!-- <param name="shadow_filter_strength" value="50"/> -->
+
+    <!-- Adjust sensitivity level of the rangefinder subsystem -->
+    <!-- Negative value corresponds to decreased sensitivity while positive value means enhanced sensitivity -->
+    <!-- Only integers between -20 and 10 (inclusive) are allowed -->
+    <!-- <param name="receiver_sensitivity_boost" value="0"/> -->
   </node>
 </launch>

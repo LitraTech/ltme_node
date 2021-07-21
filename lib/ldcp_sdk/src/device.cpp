@@ -626,4 +626,92 @@ void Device::rebootToBootloader()
   session_->executeCommand(std::move(request));
 }
 
+error_t Device::setReceiverSensitivityBoost(int sensitivity_boost)
+{
+  int receiver_sensitivity_backup_value = 0;
+  error_t result = getReceiverSensitivityBackupValue(receiver_sensitivity_backup_value);
+  if (result != error_t::no_error)
+    return result;
+
+  if (receiver_sensitivity_backup_value == 4095) {
+    error_t result = getReceiverSensitivityValue(receiver_sensitivity_backup_value);
+    if (result != error_t::no_error)
+      return result;
+    result = setReceiverSensitivityBackupValue(receiver_sensitivity_backup_value);
+    if (result != error_t::no_error)
+      return result;
+  }
+
+  return setReceiverSensitivityValue(receiver_sensitivity_backup_value + sensitivity_boost);
+}
+
+error_t Device::getReceiverSensitivityBackupValue(int& sensitivity_backup_value)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("calibration/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "rangefinder.intensityThresholds.m2l", allocator), allocator);
+  request.AddMember("vendor", true, allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  if (result == error_t::no_error)
+    sensitivity_backup_value = response["result"].GetInt();
+
+  return result;
+}
+
+error_t Device::setReceiverSensitivityBackupValue(int sensitivity_backup_value)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("calibration/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "rangefinder.intensityThresholds.m2l", allocator)
+                      .AddMember("value", sensitivity_backup_value, allocator),
+                    allocator);
+  request.AddMember("vendor", true, allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
+error_t Device::getReceiverSensitivityValue(int& sensitivity_value)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "APD.voltageOffset", allocator), allocator);
+  request.AddMember("vendor", true, allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+  if (result == error_t::no_error)
+    sensitivity_value = response["result"].GetInt();
+
+  return result;
+}
+
+error_t Device::setReceiverSensitivityValue(int sensitivity_value)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "APD.voltageOffset", allocator)
+                      .AddMember("value", sensitivity_value, allocator),
+                    allocator);
+  request.AddMember("vendor", true, allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
 }

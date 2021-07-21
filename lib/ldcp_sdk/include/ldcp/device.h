@@ -56,6 +56,14 @@ public:
   error_t persistSettings();
 
   void rebootToBootloader();
+
+  error_t setReceiverSensitivityBoost(int sensitivity_boost);
+  error_t getReceiverSensitivityValue(int& sensitivity_value);
+
+private:
+  error_t getReceiverSensitivityBackupValue(int& sensitivity_backup_value);
+  error_t setReceiverSensitivityBackupValue(int sensitivity_backup_value);
+  error_t setReceiverSensitivityValue(int sensitivity_value);
 };
 
 }

@@ -27,6 +27,7 @@ public:
   const static double RANGE_MAX_LIMIT;
   const static int DEFAULT_AVERAGE_FACTOR;
   const static int DEFAULT_SHADOW_FILTER_STRENGTH;
+  const static int DEFAULT_RECEIVER_SENSITIVITY_BOOST;
 
 public:
   LidarDriver();
@@ -62,6 +63,7 @@ private:
   double range_max_;
   int average_factor_;
   int shadow_filter_strength_;
+  int receiver_sensitivity_boost_;
 
   std::unique_ptr<ldcp_sdk::Device> device_;
   std::mutex mutex_;
