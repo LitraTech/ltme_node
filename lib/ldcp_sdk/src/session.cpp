@@ -155,6 +155,23 @@ error_t Session::pollForScanBlock(rapidjson::Document& notification, std::vector
     return error_t::timed_out;
 }
 
+error_t Session::pollForLogMessage(rapidjson::Document& notification)
+{
+  std::unique_lock<std::mutex> log_message_queue_lock(log_message_queue_mutex_);
+  bool wait_result = log_message_queue_cv_.wait_for(log_message_queue_lock, std::chrono::milliseconds(50), [&]() {
+    return (log_message_queue_.size() > 0);
+  });
+  if (wait_result) {
+    if (log_message_queue_.size() > 0) {
+      notification = std::move(log_message_queue_.front());
+      log_message_queue_.pop_front();
+    }
+    return error_t::no_error;
+  }
+  else
+    return error_t::timed_out;
+}
+
 void Session::onMessageReceived(rapidjson::Document message)
 {
   if (!(message.HasMember("jsonrpc") && message["jsonrpc"] == "2.0"))
@@ -169,13 +186,23 @@ void Session::onMessageReceived(rapidjson::Document message)
       response_queue_cv_.notify_one();
     }
   }
-  else if ((message.HasMember("method") && message["method"] == "notification/laserScan") &&
-           message.HasMember("params") && !message.HasMember("id")) {
-    std::lock_guard<std::mutex> scan_block_queue_lock(scan_block_queue_mutex_);
-    if (scan_block_queue_primary_.size() == SCAN_BLOCK_BUFFERING_COUNT)
-      scan_block_queue_primary_.pop_front();
-    scan_block_queue_primary_.push_back(std::move(message));
-    scan_block_queue_cv_.notify_one();
+  else if (message.HasMember("method") && message.HasMember("params") &&
+           !message.HasMember("id")) {
+    std::string method = message["method"].GetString();
+    if (method == "notification/laserScan") {
+      std::lock_guard<std::mutex> scan_block_queue_lock(scan_block_queue_mutex_);
+      if (scan_block_queue_primary_.size() == SCAN_BLOCK_BUFFERING_COUNT)
+        scan_block_queue_primary_.pop_front();
+      scan_block_queue_primary_.push_back(std::move(message));
+      scan_block_queue_cv_.notify_one();
+    }
+    else if (method == "notification/log") {
+      std::lock_guard<std::mutex> log_message_queue_lock(log_message_queue_mutex_);
+      if (log_message_queue_.size() == LOG_MESSAGE_BUFFERING_COUNT)
+        log_message_queue_.pop_front();
+      log_message_queue_.push_back(std::move(message));
+      log_message_queue_cv_.notify_one();
+    }
   }
 }
 

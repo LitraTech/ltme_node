@@ -5,6 +5,10 @@
 #include "ldcp/error.h"
 #include "ldcp/data_types.h"
 
+#include <thread>
+#include <atomic>
+#include <mutex>
+
 namespace ldcp_sdk
 {
 
@@ -26,12 +30,22 @@ public:
   bool isOpened() const;
   void close();
 
+  void setLogMessageCallback(LogMessageCallback callback);
+
   error_t queryOperationMode(std::string& mode);
   void reboot();
+
+private:
+  void logMessageHandlerLoop();
 
 protected:
   std::unique_ptr<Location> location_;
   std::unique_ptr<Session> session_;
+
+  std::thread log_message_handler_thread_;
+  std::atomic<bool> quit_log_message_handler_;
+  LogMessageCallback log_message_callback_;
+  std::mutex log_message_mutex_;
 };
 
 }

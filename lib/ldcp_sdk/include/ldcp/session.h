@@ -31,6 +31,7 @@ public:
 
   error_t pollForScanBlock(rapidjson::Document& notification,
                            std::vector<uint8_t>& oob_data);
+  error_t pollForLogMessage(rapidjson::Document& notification);
 
 private:
   void onMessageReceived(rapidjson::Document message);
@@ -39,6 +40,7 @@ private:
 private:
   static const int DEFAULT_TIMEOUT = 3000;
   static const int SCAN_BLOCK_BUFFERING_COUNT = 32;
+  static const int LOG_MESSAGE_BUFFERING_COUNT = 32;
 
 private:
   int timeout_;
@@ -56,6 +58,10 @@ private:
   std::deque<std::vector<uint8_t>> scan_block_queue_oob_;
   std::mutex scan_block_queue_mutex_;
   std::condition_variable scan_block_queue_cv_;
+
+  std::deque<rapidjson::Document> log_message_queue_;
+  std::mutex log_message_queue_mutex_;
+  std::condition_variable log_message_queue_cv_;
 };
 
 }

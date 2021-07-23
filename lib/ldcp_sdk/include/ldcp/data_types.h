@@ -1,12 +1,21 @@
 #ifndef LDCP_SDK_DATA_TYPES_H_
 #define LDCP_SDK_DATA_TYPES_H_
 
+#include <functional>
 #include <vector>
 #include <cstdint>
-#include <memory>
 
 namespace ldcp_sdk
 {
+
+enum log_level_t {
+  debug = 0,
+  info,
+  warn,
+  error
+};
+
+typedef std::function<void(log_level_t, const std::string&)> LogMessageCallback;
 
 class ScanBlock
 {

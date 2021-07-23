@@ -182,6 +182,25 @@ void LidarDriver::run()
             ROS_WARN("Unable to set shadow filter strength");
         }
 
+        device_->setLogMessageCallback([&](ldcp_sdk::log_level_t log_level, const std::string& message) {
+          switch (log_level) {
+            case ldcp_sdk::log_level_t::debug:
+              ROS_DEBUG("%s", message.c_str());
+              break;
+            case ldcp_sdk::log_level_t::info:
+              ROS_INFO("%s", message.c_str());
+              break;
+            case ldcp_sdk::log_level_t::warn:
+              ROS_WARN("%s", message.c_str());
+              break;
+            case ldcp_sdk::log_level_t::error:
+              ROS_ERROR("%s", message.c_str());
+              break;
+            default:
+              break;
+          }
+        });
+
         device_->startMeasurement();
         device_->startStreaming();
 
