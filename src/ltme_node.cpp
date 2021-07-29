@@ -6,6 +6,7 @@
 
 const std::string LidarDriver::DEFAULT_ENFORCED_TRANSPORT_MODE = "none";
 const std::string LidarDriver::DEFAULT_FRAME_ID = "laser";
+const bool LidarDriver::DEFAULT_INVERT_FRAME = false;
 const int LidarDriver::DEFAULT_SCAN_FREQUENCY = 15;
 const double LidarDriver::ANGLE_MIN_LIMIT = -2.356;
 const double LidarDriver::ANGLE_MAX_LIMIT = 2.356;
@@ -32,6 +33,7 @@ LidarDriver::LidarDriver()
   }
   nh_private_.param<std::string>("enforced_transport_mode", enforced_transport_mode_, DEFAULT_ENFORCED_TRANSPORT_MODE);
   nh_private_.param<std::string>("frame_id", frame_id_, DEFAULT_FRAME_ID);
+  nh_private_.param<bool>("invert_frame", invert_frame_, DEFAULT_INVERT_FRAME);
   nh_private_.param<int>("scan_frequency_override", scan_frequency_override_, 0);
   nh_private_.param<double>("angle_min", angle_min_, ANGLE_MIN_LIMIT);
   nh_private_.param<double>("angle_max", angle_max_, ANGLE_MAX_LIMIT);
@@ -216,9 +218,10 @@ void LidarDriver::run()
 
         sensor_msgs::LaserScan laser_scan;
         laser_scan.header.frame_id = frame_id_;
-        laser_scan.angle_min = angle_min_;
-        laser_scan.angle_max = angle_max_;
-        laser_scan.angle_increment = 2 * M_PI / beam_count * average_factor_;
+        laser_scan.angle_min = (!invert_frame_) ? angle_min_ : angle_max_;
+        laser_scan.angle_max = (!invert_frame_) ? angle_max_ : angle_min_;
+        laser_scan.angle_increment = ((!invert_frame_) ? 1 : -1) *
+            2 * M_PI / beam_count * average_factor_;
         laser_scan.time_increment = 1.0 / scan_frequency / beam_count * average_factor_;
         laser_scan.scan_time = 1.0 / scan_frequency;
         laser_scan.range_min = range_min_;

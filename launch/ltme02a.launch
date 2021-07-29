@@ -16,6 +16,11 @@
     <!-- Frame ID used by the published LaserScan messages -->
     <!-- <param name="frame_id" value="laser"/> -->
 
+    <!-- If this option is enabled, published LaserScan messages will have their X and Z axes inverted. -->
+    <!-- This is mostly useful when the device is mounted upside down, as it effectively undos the inversion created by the mounting, -->
+    <!-- and makes it look like the scans are from a device installed in a normal, upward direction. -->
+    <!-- <param name="invert_frame" value="false"/> -->
+
     <!-- LTME-02 can be configured with different scan frequencies, ranging from 10 Hz to 30 Hz with 5 Hz increments. -->
     <!-- The driver automatically queries device for its frequency upon connection and setup LaserScan parameters accordingly. -->
     <!-- If for some reason this doesn't work for you (e.g., a device with outdated firmware), -->

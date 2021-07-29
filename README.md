@@ -68,6 +68,8 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 
 `~frame_id` (string, default: "laser") *[Optional]*: Frame ID of published LaserScan messages.
 
+`~invert_frame` (bool, default: "false") *[Optional]*: If this option is enabled, published LaserScan messages will have their X and Z axes inverted. This is mostly useful when the device is mounted upside down, as it effectively undos the inversion created by the mounting, and makes it look like the scans are from a device installed in a normal, upward direction.
+
 `~scan_frequency_override` (integer, default: 0) *[Optional]*: LTME series devices can be configured to have different scan frequencies, ranging from 10 Hz to 30 Hz with 5 Hz increment. `ltme_node` automatically queries device for its scan frequency upon connection and setup `LaserScan` parameters accordingly, so normally you don't need this parameter and should leave it commented out. If for some reason this doesn't work (e.g., a device with outdated firmware), this parameter can be used to override automatic detection and manually specify a correct frequency value.
 
 `~angle_min` and `~angle_max` (float, default: -2.356 and 2.356): Start and end angle of published laser scans (in radians). As LTME series devices have an FOV of 270 degrees, the minimum allowed value for `angle_min` is -2.356 (about -3 * pi / 4), and the maximum allowed value for `angle_max` is 2.356 (about 3 * pi / 4).
