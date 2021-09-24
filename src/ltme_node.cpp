@@ -127,6 +127,25 @@ void LidarDriver::run()
   ros::Rate loop_rate(0.3);
   while (nh_.ok() && !quit_driver_.load()) {
     if (device_->open() == ldcp_sdk::no_error) {
+      std::string firmware_version, hardware_version;
+      if (!(device_->queryFirmwareVersion(firmware_version) == ldcp_sdk::no_error &&
+            device_->queryHardwareVersion(hardware_version) == ldcp_sdk::no_error))
+        ROS_WARN("Unable to check firmware/hardware version");
+      else if (firmware_version == "0207" && hardware_version == "0301") {
+        ROS_INFO("Found firmware version %s, will attempt to update to lastest version", firmware_version.c_str());
+
+        device_->rebootToBootloader();
+        device_->close();
+
+        ROS_INFO("Device rebooted to bootloader mode");
+
+        // Update firmware start
+        // TODO: complete code here
+        // Update firmware end
+
+        continue;
+      }
+
       hibernation_requested_ = false;
 
       lock.unlock();
