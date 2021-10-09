@@ -17,6 +17,7 @@ class LidarDriver
 {
 public:
   const static std::string DEFAULT_ENFORCED_TRANSPORT_MODE;
+  const static bool DEFAULT_DISABLE_OOB_AUTO_STREAMING;
   const static std::string DEFAULT_FRAME_ID;
   const static bool DEFAULT_INVERT_FRAME;
   const static int DEFAULT_SCAN_FREQUENCY;
@@ -54,6 +55,7 @@ private:
   std::string device_model_;
   std::string device_address_;
   std::string enforced_transport_mode_;
+  bool disable_oob_auto_streaming_;
   std::string frame_id_;
   bool invert_frame_;
   int scan_frequency_override_;

@@ -5,6 +5,7 @@
 #include <sensor_msgs/LaserScan.h>
 
 const std::string LidarDriver::DEFAULT_ENFORCED_TRANSPORT_MODE = "none";
+const bool LidarDriver::DEFAULT_DISABLE_OOB_AUTO_STREAMING = false;
 const std::string LidarDriver::DEFAULT_FRAME_ID = "laser";
 const bool LidarDriver::DEFAULT_INVERT_FRAME = false;
 const int LidarDriver::DEFAULT_SCAN_FREQUENCY = 15;
@@ -32,6 +33,7 @@ LidarDriver::LidarDriver()
     exit(-1);
   }
   nh_private_.param<std::string>("enforced_transport_mode", enforced_transport_mode_, DEFAULT_ENFORCED_TRANSPORT_MODE);
+  nh_private_.param<bool>("disable_oob_auto_streaming", disable_oob_auto_streaming_, DEFAULT_DISABLE_OOB_AUTO_STREAMING);
   nh_private_.param<std::string>("frame_id", frame_id_, DEFAULT_FRAME_ID);
   nh_private_.param<bool>("invert_frame", invert_frame_, DEFAULT_INVERT_FRAME);
   nh_private_.param<int>("scan_frequency_override", scan_frequency_override_, 0);
@@ -172,6 +174,21 @@ void LidarDriver::run()
         }
         else
           ROS_WARN("Unable to query device for firmware version, \"enforced_transport_mode\" parameter will be ignored");
+      }
+
+      if (disable_oob_auto_streaming_) {
+        bool oob_auto_streaming_enabled = false;
+        if (device_->getOobAutoStartStreaming(oob_auto_streaming_enabled) == ldcp_sdk::no_error) {
+          if (oob_auto_streaming_enabled) {
+            ROS_INFO("Auto streaming in OOB mode will be disabled");
+            device_->setOobAutoStartStreaming(false);
+            device_->persistSettings();
+            reboot_required = true;
+          }
+        }
+        else
+          ROS_WARN("Unable to check enable state of auto streaming in OOB mode, "
+            "\"disable_oob_auto_streaming\" parameter will be ignored");
       }
 
       if (!reboot_required) {

@@ -13,6 +13,9 @@
     <!-- * oob: enforce out-of-band mode, where data are streamed through a dedicated UDP channel -->
     <!-- <param name="enforced_transport_mode" value="none"/> -->
 
+    <!-- If set to true, the driver will disable OOB mode's automatic data streaming feature (enabled in factory default settings). -->
+    <!-- <param name="disable_oob_auto_streaming" value="false"/> -->
+
     <!-- Frame ID used by the published LaserScan messages -->
     <!-- <param name="frame_id" value="laser"/> -->
 

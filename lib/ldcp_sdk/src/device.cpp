@@ -356,6 +356,23 @@ error_t Device::getSubnetMask(in_addr_t& subnet)
   return result;
 }
 
+error_t Device::getHostName(std::string& host_name)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "connectivity.network.hostName", allocator), allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  if (result == error_t::no_error)
+    host_name = response["result"].GetString();
+
+  return result;
+}
+
 error_t Device::getScanFrequency(int& frequency)
 {
   rapidjson::Document request = session_->createEmptyRequestObject(), response;
@@ -416,6 +433,22 @@ error_t Device::isOobEnabled(bool& enabled)
 
   error_t result = session_->executeCommand(std::move(request), response);
 
+  if (result == error_t::no_error)
+    enabled = response["result"].GetBool();
+
+  return result;
+}
+
+error_t Device::getOobAutoStartStreaming(bool& enabled)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "transport.oob.autoStartStreaming", allocator), allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
   if (result == error_t::no_error)
     enabled = response["result"].GetBool();
 
@@ -511,6 +544,23 @@ error_t Device::setSubnetMask(in_addr_t subnet)
   return result;
 }
 
+error_t Device::setHostName(const std::string& host_name)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "connectivity.network.hostName", allocator)
+                      .AddMember("value", rapidjson::Value().SetString(
+                        host_name.c_str(), allocator), allocator),
+                    allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
 error_t Device::setScanFrequency(int frequency)
 {
   rapidjson::Document request = session_->createEmptyRequestObject(), response;
@@ -567,6 +617,22 @@ error_t Device::setOobEnabled(bool enabled)
   request.AddMember("params",
                     rapidjson::Value().SetObject()
                       .AddMember("entry", "transport.oob.enabled", allocator)
+                      .AddMember("value", enabled, allocator),
+                    allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
+error_t Device::setOobAutoStartStreaming(bool enabled)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "transport.oob.autoStartStreaming", allocator)
                       .AddMember("value", enabled, allocator),
                     allocator);
 
