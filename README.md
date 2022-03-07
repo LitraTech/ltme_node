@@ -1,5 +1,6 @@
 ROS driver for LitraTech's latest generation of mechanical 2D LiDARs running LDCP (**L**iDAR **D**ata and **C**ontrol **P**rotocol). Supported models are:
 * LTME-02A
+* LT-R1
 
 # Build and Install
 
@@ -51,9 +52,10 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 
 `~device_model` (string) **[Required]**: Model name of the target device. Supported models are:
 - LTME-02A
+- LT-R1
 
 `~device_address` (string) **[Required]**: Address of the target device:
-- For LTME-02A, this parameter should be an IP address with optional port number, e.g., `192.168.10.160` or `192.168.10.160:2105`
+- For LTME-02A and LT-R1, this parameter should be an IP address with optional port number, e.g., `192.168.10.160` or `192.168.10.160:2105`
 
 `~enforced_transport_mode` (string, default: "none") *[Optional]*: Enforce specific transport mode used by the device to stream measurement data. If set to "normal" or "oob", device settings will be changed to selected mode and saved in non-volatile memory in case of a mismatch. Available options are:
 - `none`: don't enforce any mode and use device's current configuration
@@ -64,7 +66,7 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 
 > **Some background**:
 > <p>In order to support communication interfaces lacking multiplexed connections (serial interfaces in particular), LDCP was initially designed around a shared connection model. In this model, command interactions and measurement data are encapsulated in JSON-style messages and transmitted through the same underlying connection. For the receiver part, it has to parse received JSON messages and extract encoded binary data, which may have adverse impact on performance for systems under heavy load.
-> <p>To solve this problem, later iteration of LDCP introduced a new out-of-band (OOB) transport mode. For supported interfaces, this mode creates a separate (out-of-band) communication channel and uses this channel to stream measurements in binary form, making it much easier for the receiver to process. For example, if OOB mode is enabled for Ethernet capable devices (such as LTME-02A), command interactions will be transmitted over a TCP connection, while measurement data are streamed through a dedicated UDP channel.
+> <p>To solve this problem, later iteration of LDCP introduced a new out-of-band (OOB) transport mode. For supported interfaces, this mode creates a separate (out-of-band) communication channel and uses this channel to stream measurements in binary form, making it much easier for the receiver to process. For example, if OOB mode is enabled for Ethernet capable devices (such as LTME-02A and LT-R1), command interactions will be transmitted over a TCP connection, while measurement data are streamed through a dedicated UDP channel.
 
 `~frame_id` (string, default: "laser") *[Optional]*: Frame ID of published LaserScan messages.
 
@@ -100,4 +102,4 @@ update_firmware 192.168.10.160 firmware.bin
 
 *Note 1: LDCP only allows one simultaneous connection to device. Before running the updater, please make sure no other clients are connected. If the driver is currently active, its `~quit_driver` service can be called to close the connection.*
 
-*Note 2: When updating device's firmware, it must be rebooted to run bootloader. For LTME-02A, IP address in bootloader mode is fixed to be 192.168.10.161, regardless of how you've set its address in normal mode. For the updater to successfully connect to bootloader, host computer's network interface must be configured with an address in the 192.168.10.x range; otherwise, it will not be able to reach the bootloader, and you'll have to manually power cycle the device to recover from bootloader mode.*
+*Note 2: When updating device's firmware, it must be rebooted to run bootloader. For LTME-02A and LT-R1, IP address in bootloader mode is fixed to be 192.168.10.161, regardless of how you've set its address in normal mode. For the updater to successfully connect to bootloader, host computer's network interface must be configured with an address in the 192.168.10.x range; otherwise, it will not be able to reach the bootloader, and you'll have to manually power cycle the device to recover from bootloader mode.*
