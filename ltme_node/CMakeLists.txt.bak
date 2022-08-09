@@ -1,0 +1,56 @@
+#  把 ldcp 单独领出来编译 然后还是连接报错
+
+cmake_minimum_required(VERSION 3.8)
+project(ltme_node)
+
+# 启用c++ 14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic -Wno-deprecated -Wno-error -fPIC)
+endif()
+
+# find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(ldcp_sdk REQUIRED)
+find_package(ltme_interfaces REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+set(dependencies rclcpp ltme_interfaces ldcp_sdk sensor_msgs std_msgs rosidl_default_generators)
+
+ament_package()
+
+###########
+## Build ##
+###########
+
+include_directories(
+  include
+  "${PROJECT_SOURCE_DIR}/include"
+)
+
+# find_package(ldcp_sdk REQUIRED)
+add_executable(ltme_node src/ltme_node.cpp)
+ament_target_dependencies(ltme_node ${dependencies})
+# target_link_libraries(ltme_node
+#   ${ldcp_sdk_LIBRARIES}
+# )
+# target_link_libraries(
+#   ldcp_sdk
+# )
+#############
+## Install ##
+#############
+
+install(TARGETS ltme_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY launch
+  DESTINATION include
+)

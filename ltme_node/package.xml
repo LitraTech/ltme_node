@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ltme_node</name>
+  <version>1.0.0</version>
+  <description>ROS driver for LitraTech's newer generation of mechanical 2D LiDARs</description>
+
+  <maintainer email="code@litratech.com">LitraTech</maintainer>
+
+  <license>Apache 2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>std_msgs</depend>
+  <depend>ltme_interfaces</depend>
+  <depend>ldcp_sdk</depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+  <build_export_depend>message_runtime</build_export_depend>
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

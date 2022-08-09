@@ -1,28 +1,25 @@
-ROS driver for LitraTech's latest generation of mechanical 2D LiDARs running LDCP (**L**iDAR **D**ata and **C**ontrol **P**rotocol). Supported models are:
+# Introduction
+**ROS2 foxy** driver for LitraTech's latest generation of mechanical 2D LiDARs running LDCP (**L**iDAR **D**ata and **C**ontrol **P**rotocol). Supported models are:
 * LTME-02A
+
+## Differences
+DO NOT SUPPORT UPDATE FIRMWARE
 
 # Build and Install
 
 ## Dependencies
-
-* C++11 capable compiler: **[Required]**
-* OpenSSL: *[Optional]* The firmware updater will not be built if OpenSSL development files are missing; other parts of the package are not affected.
+* ROS2 Foxy
+* C++ 14
 
 ## Build the Package
 
 Clone or extract package source to your catkin workspace's `src` directory, then build the workspace:
 
 ```
-cd ~/catkin_ws/src
-git clone https://github.com/LitraTech/ltme_node.git
-cd .. && catkin_make
-```
-
-Or if you only want the package itself to be built:
-
-```
-cd ~/catkin_ws
-catkin_make --only-pkg-with-deps ltme_node
+mkdir -p ~/ros2_ws/src
+cd ~/ros2_ws/src
+git clone https://github.com/TonyTnT/ltme_node.git -b ros2-foxy
+cd .. && colcon build --symlink-install
 ```
 
 # Nodes
@@ -82,22 +79,23 @@ Reads measurement data (ranges & intensities) from connected device and publishe
 
 `~shadow_filter_strength` (integer, default: 50): Indicates how data post-processing stage will filter scan artifacts caused by veiling effect. This effect usually occurs when the edge of an object is scanned and manifests itself in the form of a series of points spreading out along the ray direction. Only integers &ge; 0 and &le; 100 are allowed. Larger value leads to more aggressive filtering.
 
-# Utilities
+# ~~Utilities~~
 
-## update_firmware
+## ~~update_firmware~~
 
-Connects to the device specified and updates its firmware with provided file. Command syntax is as follows:
+~~Connects to the device specified and updates its firmware with provided file. Command syntax is as follows:~~
 
 ```
 update_firmware <device address> <firmware file>
 ```
 
-For example, if the device is at `192.168.10.160`, and latest firmware is stored in file `firmware.bin`, then the following command will do:
+~~For example, if the device is at `192.168.10.160`, and latest firmware is stored in file `firmware.bin`, then the following command will do:~~
+
 
 ```
 update_firmware 192.168.10.160 firmware.bin
 ```
 
-*Note 1: LDCP only allows one simultaneous connection to device. Before running the updater, please make sure no other clients are connected. If the driver is currently active, its `~quit_driver` service can be called to close the connection.*
+*~~Note 1: LDCP only allows one simultaneous connection to device. Before running the updater, please make sure no other clients are connected. If the driver is currently active, its `~quit_driver` service can be called to close the connection.~~*
 
-*Note 2: When updating device's firmware, it must be rebooted to run bootloader. For LTME-02A, IP address in bootloader mode is fixed to be 192.168.10.161, regardless of how you've set its address in normal mode. For the updater to successfully connect to bootloader, host computer's network interface must be configured with an address in the 192.168.10.x range; otherwise, it will not be able to reach the bootloader, and you'll have to manually power cycle the device to recover from bootloader mode.*
+*~~Note 2: When updating device's firmware, it must be rebooted to run bootloader. For LTME-02A, IP address in bootloader mode is fixed to be 192.168.10.161, regardless of how you've set its address in normal mode. For the updater to successfully connect to bootloader, host computer's network interface must be configured with an address in the 192.168.10.x range; otherwise, it will not be able to reach the bootloader, and you'll have to manually power cycle the device to recover from bootloader mode.~~*
