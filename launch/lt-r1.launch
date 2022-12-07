@@ -13,12 +13,6 @@
     <!-- and makes it look like the scans are from a device installed in a normal, upward direction. -->
     <!-- <param name="invert_frame" value="false"/> -->
 
-    <!-- LT-R1 can be configured with different scan frequencies, ranging from 10 Hz to 30 Hz with 5 Hz increments. -->
-    <!-- The driver automatically queries device for its frequency upon connection and setup LaserScan parameters accordingly. -->
-    <!-- If for some reason this doesn't work for you (e.g., a device with outdated firmware), -->
-    <!-- this parameter can be used to override automatic detection and manually specify a correct frequency value. -->
-    <!-- <param name="scan_frequency_override" value="15"/> -->
-
     <!-- Start and end angle of published scans -->
     <!-- As LT-R1 has an FOV of 270 degrees, the minimum allowed value for angle_min is -2.356 (about -3 * pi / 4), and the maximum allowed value for angle_max is 2.356 (about 3 * pi / 4) -->
     <!-- <param name="angle_min" value="-1.571"/> -->
@@ -33,10 +27,6 @@
     <!-- Defaults to 0.05 and 30 respectively if not specified -->
     <!-- <param name="range_min" value="0.05"/> -->
     <!-- <param name="range_max" value="30"/> -->
-
-    <!-- Number of neighboring measurements to be averaged -->
-    <!-- Averaging reduces jitter but angular resolution will also decrease by the same factor -->
-    <!-- <param name="average_factor" value="2"/> -->
 
     <!-- Adjust how data post-processing stage will filter scan artifacts caused by veiling effect -->
     <!-- Valid range is between 0 and 100 inclusive, larger value leads to more aggressive filtering -->

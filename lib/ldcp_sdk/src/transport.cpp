@@ -337,34 +337,15 @@ void NetworkTransport::encapsulateOutgoingMessage(rapidjson::Document& message)
 
 bool NetworkTransport::verifyOobPacket(uint8_t* data, int length)
 {
-  OobPacket* oob_packet = reinterpret_cast<OobPacket*>(data);
+  OobPacketHeader* oob_packet_header = reinterpret_cast<OobPacketHeader*>(data);
 
-  if (length < offsetof(OobPacket, payload) || oob_packet->signature != 0xFFFF)
+  if (length < sizeof(OobPacketHeader) || oob_packet_header->signature != 0xFFFF)
     return false;
 
-  int block_length = oob_packet->count;
-  int expected_length = 0;
-  switch (block_length) {
-    case LASER_SCAN_BLOCK_LENGTH_10HZ:
-      expected_length = offsetof(OobPacket, payload) + sizeof(oob_packet->payload.data_10hz);
-      break;
-    case LASER_SCAN_BLOCK_LENGTH_15HZ:
-      expected_length = offsetof(OobPacket, payload) + sizeof(oob_packet->payload.data_15hz);
-      break;
-    case LASER_SCAN_BLOCK_LENGTH_20HZ:
-      expected_length = offsetof(OobPacket, payload) + sizeof(oob_packet->payload.data_20hz);
-      break;
-    case LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ:
-      expected_length = offsetof(OobPacket, payload) + sizeof(oob_packet->payload.data_25hz_30hz);
-      break;
-  }
-  if (length != expected_length)
-    return false;
-
-  uint16_t saved_checksum = oob_packet->checksum;
-  oob_packet->checksum = 0;
+  uint16_t saved_checksum = oob_packet_header->checksum;
+  oob_packet_header->checksum = 0;
   bool packet_valid = (Utility::CalculateCRC16(data, data + length) == saved_checksum);
-  oob_packet->checksum = saved_checksum;
+  oob_packet_header->checksum = saved_checksum;
   return packet_valid;
 }
 

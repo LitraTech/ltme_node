@@ -9,6 +9,8 @@ typedef ULONG in_addr_t;
 typedef USHORT in_port_t;
 #endif
 
+#include <string>
+
 namespace ldcp_sdk
 {
 
@@ -16,6 +18,8 @@ class Location
 {
 public:
   virtual ~Location() = default;
+
+  virtual std::string label() const = 0;
 
 protected:
   Location() = default;
@@ -32,6 +36,8 @@ public:
 
   in_addr_t address() const;
   in_port_t port() const;
+
+  virtual std::string label() const;
 
 private:
   in_addr_t address_;

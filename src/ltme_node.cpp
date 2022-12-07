@@ -8,12 +8,13 @@ const std::string LidarDriver::DEFAULT_ENFORCED_TRANSPORT_MODE = "none";
 const std::string LidarDriver::DEFAULT_FRAME_ID = "laser";
 const bool LidarDriver::DEFAULT_INVERT_FRAME = false;
 const int LidarDriver::DEFAULT_SCAN_FREQUENCY = 15;
-const double LidarDriver::ANGLE_MIN_LIMIT = -2.356;
-const double LidarDriver::ANGLE_MAX_LIMIT = 2.356;
+const double LidarDriver::ANGLE_MIN_LIMIT = -3.142;
+const double LidarDriver::ANGLE_MAX_LIMIT = 3.142;
 const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MIN = -3.142;
 const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MAX = -3.142;
 const double LidarDriver::RANGE_MIN_LIMIT = 0.05;
-const double LidarDriver::RANGE_MAX_LIMIT = 30;
+const double LidarDriver::RANGE_MAX_LIMIT_I1 = 100;
+const double LidarDriver::RANGE_MAX_LIMIT_R1 = 30;
 const int LidarDriver::DEFAULT_AVERAGE_FACTOR = 1;
 const int LidarDriver::DEFAULT_SHADOW_FILTER_STRENGTH = 50;
 const int LidarDriver::DEFAULT_RECEIVER_SENSITIVITY_BOOST = 0;
@@ -25,6 +26,10 @@ LidarDriver::LidarDriver()
 {
   if (!nh_private_.getParam("device_model", device_model_)) {
     ROS_ERROR("Missing required parameter \"device_model\"");
+    exit(-1);
+  }
+  else if (device_model_ != "LT-I1" && device_model_ != "LT-R1" && device_model_ != "LT-R2") {
+    ROS_ERROR("Unsupported device model %s", device_model_.c_str());
     exit(-1);
   }
   if (!nh_private_.getParam("device_address", device_address_)) {
@@ -40,10 +45,12 @@ LidarDriver::LidarDriver()
   nh_private_.param<double>("angle_excluded_min", angle_excluded_min_, DEFAULT_ANGLE_EXCLUDED_MIN);
   nh_private_.param<double>("angle_excluded_max", angle_excluded_max_, DEFAULT_ANGLE_EXCLUDED_MAX);
   nh_private_.param<double>("range_min", range_min_, RANGE_MIN_LIMIT);
-  nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT);
+  if (device_model_ == "LT-I1")
+    nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT_I1);
+  else if (device_model_ == "LT-R1" || device_model_ == "LT-R2")
+    nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT_R1);
   nh_private_.param<int>("average_factor", average_factor_, DEFAULT_AVERAGE_FACTOR);
   nh_private_.param<int>("shadow_filter_strength", shadow_filter_strength_, DEFAULT_SHADOW_FILTER_STRENGTH);
-  nh_private_.param<int>("receiver_sensitivity_boost", receiver_sensitivity_boost_, DEFAULT_RECEIVER_SENSITIVITY_BOOST);
 
   if (!(enforced_transport_mode_ == "none" || enforced_transport_mode_ == "normal" || enforced_transport_mode_ == "oob")) {
     ROS_ERROR("Transport mode \"%s\" not supported", enforced_transport_mode_.c_str());
@@ -74,20 +81,12 @@ LidarDriver::LidarDriver()
     ROS_ERROR("range_min is set to %f while its minimum allowed value is %f", range_min_, RANGE_MIN_LIMIT);
     exit(-1);
   }
-  if (range_max_ > RANGE_MAX_LIMIT) {
-    ROS_ERROR("range_max is set to %f while its maximum allowed value is %f", range_max_, RANGE_MAX_LIMIT);
-    exit(-1);
-  }
   if (average_factor_ <= 0 || average_factor_ > 8) {
     ROS_ERROR("average_factor is set to %d while its valid value is between 1 and 8", average_factor_);
     exit(-1);
   }
   if (shadow_filter_strength_ < 0 || average_factor_ > 100) {
     ROS_ERROR("shadow_filter_strength is set to %d while its valid value is between 0 and 100 (inclusive)", shadow_filter_strength_);
-    exit(-1);
-  }
-  if (receiver_sensitivity_boost_ < -20 || receiver_sensitivity_boost_ > 10) {
-    ROS_ERROR("receiver_sensitivity_boost is set to %d while the valid range is between -20 and 10 (inclusive)", receiver_sensitivity_boost_);
     exit(-1);
   }
 }
@@ -190,27 +189,19 @@ void LidarDriver::run()
             ROS_WARN("Unable to set shadow filter strength");
         }
 
-        if (receiver_sensitivity_boost_ != DEFAULT_RECEIVER_SENSITIVITY_BOOST) {
-          if (device_->setReceiverSensitivityBoost(receiver_sensitivity_boost_) == ldcp_sdk::no_error) {
-            ROS_INFO("Receiver sensitivity boost %d applied", receiver_sensitivity_boost_);
-            int current_receiver_sensitivity = 0;
-            if (device_->getReceiverSensitivityValue(current_receiver_sensitivity) == ldcp_sdk::no_error)
-              ROS_INFO("Current receiver sensitivity: %d", current_receiver_sensitivity);
-          }
-        }
-
         device_->startMeasurement();
         device_->startStreaming();
 
-        int beam_count = 0;
-        switch (scan_frequency) {
-          case 10: beam_count = 3072; break;
-          case 15: beam_count = 2048; break;
-          case 20: beam_count = 1536; break;
-          case 25:
-          case 30: beam_count = 1024; break;
-          default: beam_count = 2048; break;
-        }
+        auto readScanBlock = [&](ldcp_sdk::ScanBlock& scan_block) {
+          if (device_->readScanBlock(scan_block) != ldcp_sdk::no_error)
+            throw std::exception();
+        };
+
+        ldcp_sdk::ScanBlock scan_block;
+        readScanBlock(scan_block);
+
+        int beam_count = scan_block.block_count * scan_block.block_length * 360 /
+          ((scan_block.angular_fov == ldcp_sdk::ANGULAR_FOV_270DEG) ? 270 : 360);
         int beam_index_min = std::ceil(angle_min_ * beam_count / (2 * M_PI));
         int beam_index_max = std::floor(angle_max_ * beam_count / (2 * M_PI));
         int beam_index_excluded_min = std::ceil(angle_excluded_min_ * beam_count / (2 * M_PI));
@@ -227,15 +218,10 @@ void LidarDriver::run()
         laser_scan.range_min = range_min_;
         laser_scan.range_max = range_max_;
 
-        auto readScanBlock = [&](ldcp_sdk::ScanBlock& scan_block) {
-          if (device_->readScanBlock(scan_block) != ldcp_sdk::no_error)
-            throw std::exception();
-        };
-
         auto updateLaserScan = [&](const ldcp_sdk::ScanBlock& scan_block) {
           int block_size = scan_block.layers[0].ranges.size();
           for (int i = 0; i < block_size; i++) {
-            int beam_index = block_size * (scan_block.block_id - 4) + i;
+            int beam_index = (scan_block.block_index - scan_block.block_count / 2) * block_size + i;
             if (beam_index < beam_index_min || beam_index > beam_index_max)
               continue;
             if (beam_index >= beam_index_excluded_min && beam_index <= beam_index_excluded_max)
@@ -258,15 +244,14 @@ void LidarDriver::run()
           std::fill(laser_scan.ranges.begin(), laser_scan.ranges.end(), 0.0);
           std::fill(laser_scan.intensities.begin(), laser_scan.intensities.end(), 0.0);
 
-          ldcp_sdk::ScanBlock scan_block;
           try {
             do {
               readScanBlock(scan_block);
-            } while (scan_block.block_id != 0);
+            } while (scan_block.block_index != 0);
 
             laser_scan.header.stamp = ros::Time::now();
 
-            while (scan_block.block_id != 8 - 1) {
+            while (scan_block.block_index != scan_block.block_count - 1) {
               updateLaserScan(scan_block);
               readScanBlock(scan_block);
             }

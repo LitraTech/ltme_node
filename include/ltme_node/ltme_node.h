@@ -25,7 +25,8 @@ public:
   const static double DEFAULT_ANGLE_EXCLUDED_MIN;
   const static double DEFAULT_ANGLE_EXCLUDED_MAX;
   const static double RANGE_MIN_LIMIT;
-  const static double RANGE_MAX_LIMIT;
+  const static double RANGE_MAX_LIMIT_I1;
+  const static double RANGE_MAX_LIMIT_R1;
   const static int DEFAULT_AVERAGE_FACTOR;
   const static int DEFAULT_SHADOW_FILTER_STRENGTH;
   const static int DEFAULT_RECEIVER_SENSITIVITY_BOOST;
@@ -65,7 +66,6 @@ private:
   double range_max_;
   int average_factor_;
   int shadow_filter_strength_;
-  int receiver_sensitivity_boost_;
 
   std::unique_ptr<ldcp_sdk::Device> device_;
   std::mutex mutex_;

@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
   uint8_t md5_hash[MD5_DIGEST_LENGTH];
   MD5_CTX md5_context;
 
-  bootloader.setTimeout(5000);
+  bootloader.setTimeout(15000);
   try {
     std::cout << "Preparing device for firmware update..." << std::flush;
     if (bootloader.beginUpdate() != ldcp_sdk::no_error)

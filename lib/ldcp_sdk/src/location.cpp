@@ -1,5 +1,7 @@
 #include "ldcp/location.h"
 
+#include "asio.hpp"
+
 namespace ldcp_sdk
 {
 
@@ -22,6 +24,12 @@ in_addr_t NetworkLocation::address() const
 in_port_t NetworkLocation::port() const
 {
   return port_;
+}
+
+std::string NetworkLocation::label() const
+{
+  return asio::ip::address_v4(ntohl(address_)).to_string() + ":" +
+      std::to_string(ntohs(port_));
 }
 
 }
