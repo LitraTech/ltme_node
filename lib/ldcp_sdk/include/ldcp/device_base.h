@@ -20,6 +20,7 @@ public:
 
   const Location& location() const;
 
+  int getTimeout(void);
   void setTimeout(int timeout);
 
   virtual error_t open();

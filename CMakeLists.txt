@@ -9,6 +9,7 @@ find_package(catkin REQUIRED
     sensor_msgs
     message_generation
     std_msgs
+    diagnostic_msgs
 )
 
 find_package(OpenSSL)

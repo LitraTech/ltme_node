@@ -33,6 +33,11 @@ const Location& DeviceBase::location() const
   return *location_;
 }
 
+int DeviceBase::getTimeout()
+{
+  return session_->getTimeout();
+}
+
 void DeviceBase::setTimeout(int timeout)
 {
   session_->setTimeout(timeout);

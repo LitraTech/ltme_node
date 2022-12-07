@@ -3,6 +3,9 @@
 #include <arpa/inet.h>
 
 #include <sensor_msgs/LaserScan.h>
+#include <diagnostic_msgs/DiagnosticArray.h>
+
+#include <map>
 
 const std::string LidarDriver::DEFAULT_ENFORCED_TRANSPORT_MODE = "none";
 const bool LidarDriver::DEFAULT_DISABLE_OOB_AUTO_STREAMING = false;
@@ -99,6 +102,7 @@ void LidarDriver::run()
   std::unique_lock<std::mutex> lock(mutex_);
 
   ros::Publisher laser_scan_publisher = nh_.advertise<sensor_msgs::LaserScan>("scan", 16);
+  ros::Publisher diagnostics_publisher = nh_private_.advertise<diagnostic_msgs::DiagnosticArray>("diag", 16);
   ros::ServiceServer query_serial_service = nh_private_.advertiseService<ltme_node::QuerySerialRequest, ltme_node::QuerySerialResponse>
     ("query_serial", std::bind(&LidarDriver::querySerialService, this, std::placeholders::_1, std::placeholders::_2));
   ros::ServiceServer query_firmware_service = nh_private_.advertiseService<ltme_node::QueryFirmwareVersionRequest, ltme_node::QueryFirmwareVersionResponse>
@@ -331,6 +335,43 @@ void LidarDriver::run()
           }
           catch (const std::exception&) {
             ROS_WARN("Error reading data from device");
+
+            diagnostic_msgs::DiagnosticArray diagnostic_array;
+            diagnostic_array.header.stamp = ros::Time::now();
+            diagnostic_array.status.push_back(diagnostic_msgs::DiagnosticStatus());
+
+            std::string message;
+            std::map<std::string, std::string> device_properties {
+              { "model", "" }, { "serial", "" }, { "firmware_version", "" },
+              { "hardware_version", "" }, { "motor_frequency", "" }
+            };
+            int saved_timeout = device_->getTimeout();
+            device_->setTimeout(1000);
+            if (device_->queryModel(device_properties["model"]) == ldcp_sdk::no_error) {
+              message = "Connection retains but no data received";
+              device_->querySerial(device_properties["serial"]);
+              device_->queryFirmwareVersion(device_properties["firmware_version"]);
+              device_->queryHardwareVersion(device_properties["hardware_version"]);
+              double motor_frequency = NAN;
+              device_->queryMotorFrequency(motor_frequency);
+              device_properties["motor_frequency"] = std::to_string(motor_frequency);
+            }
+            else
+              message = "Lost contact with device";
+            device_->setTimeout(saved_timeout);
+
+            diagnostic_array.status[0].level = diagnostic_msgs::DiagnosticStatus::WARN;
+            diagnostic_array.status[0].name = ros::this_node::getName();
+            diagnostic_array.status[0].message = message;
+            diagnostic_array.status[0].hardware_id = device_model_;
+            for (const auto& entry : device_properties) {
+              diagnostic_msgs::KeyValue key_value;
+              key_value.key = entry.first;
+              key_value.value = entry.second;
+              diagnostic_array.status[0].values.push_back(key_value);
+            }
+            diagnostics_publisher.publish(diagnostic_array);
+
             break;
           }
         }

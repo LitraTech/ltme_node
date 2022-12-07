@@ -22,6 +22,11 @@ Session::Session()
 {
 }
 
+int Session::getTimeout()
+{
+  return timeout_;
+}
+
 void Session::setTimeout(int timeout)
 {
   timeout_ = timeout;

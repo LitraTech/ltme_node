@@ -17,6 +17,7 @@ class Session
 public:
   Session();
 
+  int getTimeout(void);
   void setTimeout(int timeout);
 
   error_t open(const Location& location);
