@@ -26,6 +26,7 @@ public:
   const static double DEFAULT_ANGLE_EXCLUDED_MAX;
   const static double RANGE_MIN_LIMIT;
   const static double RANGE_MAX_LIMIT_I1;
+  const static double RANGE_MAX_LIMIT_I2;
   const static double RANGE_MAX_LIMIT_R1;
   const static int DEFAULT_AVERAGE_FACTOR;
   const static int DEFAULT_SHADOW_FILTER_STRENGTH;

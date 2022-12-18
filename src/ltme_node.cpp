@@ -14,6 +14,7 @@ const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MIN = -3.142;
 const double LidarDriver::DEFAULT_ANGLE_EXCLUDED_MAX = -3.142;
 const double LidarDriver::RANGE_MIN_LIMIT = 0.05;
 const double LidarDriver::RANGE_MAX_LIMIT_I1 = 100;
+const double LidarDriver::RANGE_MAX_LIMIT_I2 = 70;
 const double LidarDriver::RANGE_MAX_LIMIT_R1 = 30;
 const int LidarDriver::DEFAULT_AVERAGE_FACTOR = 1;
 const int LidarDriver::DEFAULT_SHADOW_FILTER_STRENGTH = 50;
@@ -28,7 +29,8 @@ LidarDriver::LidarDriver()
     ROS_ERROR("Missing required parameter \"device_model\"");
     exit(-1);
   }
-  else if (device_model_ != "LT-I1" && device_model_ != "LT-R1" && device_model_ != "LT-R2") {
+  else if (device_model_ != "LT-I1" && device_model_ != "LT-I2" &&
+      device_model_ != "LT-R1" && device_model_ != "LT-R2") {
     ROS_ERROR("Unsupported device model %s", device_model_.c_str());
     exit(-1);
   }
@@ -47,6 +49,8 @@ LidarDriver::LidarDriver()
   nh_private_.param<double>("range_min", range_min_, RANGE_MIN_LIMIT);
   if (device_model_ == "LT-I1")
     nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT_I1);
+  else if (device_model_ == "LT-I2")
+    nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT_I2);
   else if (device_model_ == "LT-R1" || device_model_ == "LT-R2")
     nh_private_.param<double>("range_max", range_max_, RANGE_MAX_LIMIT_R1);
   nh_private_.param<int>("average_factor", average_factor_, DEFAULT_AVERAGE_FACTOR);
