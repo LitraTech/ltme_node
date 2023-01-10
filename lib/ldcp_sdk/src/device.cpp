@@ -199,32 +199,37 @@ error_t Device::readScanFrame(ScanFrame& scan_frame)
 {
   ScanBlock scan_block;
 
-  int index = 0;
-  while (index < 8) {
+  int expected_block_index = 0;
+  int block_count = INT_MAX, block_length = 0;
+  while (expected_block_index < block_count) {
     error_t result = readScanBlock(scan_block);
     if (result != error_t::no_error)
       return result;
 
-    if (scan_block.block_id != index) {
-      index = 0;
+    if (scan_block.block_index != expected_block_index) {
+      expected_block_index = 0;
       continue;
     }
     else {
-      int count = scan_block.layers[0].ranges.size();
+      if (expected_block_index == 0) {
+        block_count = scan_block.block_count;
+        block_length = scan_block.block_length;
 
-      if (index == 0) {
         scan_frame.timestamp = scan_block.timestamp;
+        scan_frame.angular_fov = scan_block.angular_fov;
         scan_frame.layers.resize(1);
-        scan_frame.layers[0].ranges.resize(count * 8);
-        scan_frame.layers[0].intensities.resize(count * 8);
+        scan_frame.layers[0].ranges.resize(block_count * block_length);
+        scan_frame.layers[0].intensities.resize(block_count * block_length);
       }
 
-      for (int i = 0; i < count; i++) {
-        scan_frame.layers[0].ranges[index * count + i] = scan_block.layers[0].ranges[i];
-        scan_frame.layers[0].intensities[index * count + i] = scan_block.layers[0].intensities[i];
+      for (int i = 0; i < block_length; i++) {
+        scan_frame.layers[0].ranges[expected_block_index * block_length + i] =
+            scan_block.layers[0].ranges[i];
+        scan_frame.layers[0].intensities[expected_block_index * block_length + i] =
+            scan_block.layers[0].intensities[i];
       }
 
-      index++;
+      expected_block_index++;
     }
   }
 
@@ -239,62 +244,67 @@ error_t Device::readScanBlock(ScanBlock& scan_block)
 
   if (result == error_t::no_error) {
     if (!notification.IsNull()) {
-      scan_block.block_id = notification["params"]["block"].GetInt();
+      scan_block.block_index = notification["params"]["block"].GetInt();
+      scan_block.block_count = 8;
       scan_block.timestamp = (uint32_t)notification["params"]["timestamp"].GetInt64();
+      scan_block.angular_fov = ANGULAR_FOV_270DEG;
       scan_block.layers.resize(notification["params"]["layers"].Size());
       for (size_t i = 0; i < scan_block.layers.size(); i++) {
         const rapidjson::Value& layer = notification["params"]["layers"][i];
         if (layer.IsNull())
           continue;
 
+        std::vector<uint8_t> decode_buffer;
         const rapidjson::Value& ranges = layer["ranges"];
         if (!ranges.IsNull()) {
-          int decoded_length = Utility::CalculateBase64DecodedLength(ranges.GetString(), ranges.GetStringLength());
-          scan_block.layers[i].ranges.resize(decoded_length / sizeof(uint16_t));
-          Utility::Base64Decode(ranges.GetString(), ranges.GetStringLength(), (uint8_t*)&scan_block.layers[i].ranges[0]);
+          int byte_count = Utility::CalculateBase64DecodedLength(ranges.GetString(), ranges.GetStringLength());
+          if (decode_buffer.size() < byte_count)
+            decode_buffer.resize(byte_count);
+          Utility::Base64Decode(ranges.GetString(), ranges.GetStringLength(), &decode_buffer[0]);
+          scan_block.block_length = byte_count / sizeof(uint16_t);
+          scan_block.layers[i].ranges.resize(scan_block.block_length);
+          for (int j = 0; j < scan_block.block_length; j++)
+            scan_block.layers[i].ranges[j] = ((uint16_t*)&decode_buffer[0])[j];
         }
         const rapidjson::Value& intensities = layer["intensities"];
         if (!intensities.IsNull()) {
-          int decoded_length = Utility::CalculateBase64DecodedLength(intensities.GetString(), intensities.GetStringLength());
-          scan_block.layers[i].intensities.resize(decoded_length);
-          Utility::Base64Decode(intensities.GetString(), intensities.GetStringLength(), &scan_block.layers[i].intensities[0]);
+          int byte_count = Utility::CalculateBase64DecodedLength(intensities.GetString(), intensities.GetStringLength());
+          if (decode_buffer.size() < byte_count)
+            decode_buffer.resize(byte_count);
+          Utility::Base64Decode(intensities.GetString(), intensities.GetStringLength(), &decode_buffer[0]);
+          scan_block.layers[i].intensities.resize(byte_count);
+          for (int j = 0; j < byte_count; j++)
+            scan_block.layers[i].intensities[j] = decode_buffer[j];
         }
       }
     }
     else if (oob_data.size() > 0) {
-      const OobPacket* oob_packet = reinterpret_cast<const OobPacket*>(oob_data.data());
+      const OobPacketHeader* oob_packet_header = reinterpret_cast<const OobPacketHeader*>(
+          oob_data.data());
 
-      int block_length = oob_packet->count;
-      const uint16_t* ranges = nullptr;
-      const uint8_t* intensities = nullptr;
+      scan_block.block_index = oob_packet_header->block_index;
+      scan_block.block_count = (oob_packet_header->block_count != 0) ? oob_packet_header->block_count : 8;
+      scan_block.block_length = oob_packet_header->block_length;
+      scan_block.timestamp = oob_packet_header->timestamp;
+      scan_block.angular_fov = (oob_packet_header->flags.angular_fov == 0) ?
+        ANGULAR_FOV_270DEG : ANGULAR_FOV_360DEG;
 
-      switch (block_length) {
-        case LASER_SCAN_BLOCK_LENGTH_10HZ:
-          ranges = oob_packet->payload.data_10hz.ranges;
-          intensities = oob_packet->payload.data_10hz.intensities;
-          break;
-        case LASER_SCAN_BLOCK_LENGTH_15HZ:
-          ranges = oob_packet->payload.data_15hz.ranges;
-          intensities = oob_packet->payload.data_15hz.intensities;
-          break;
-        case LASER_SCAN_BLOCK_LENGTH_20HZ:
-          ranges = oob_packet->payload.data_20hz.ranges;
-          intensities = oob_packet->payload.data_20hz.intensities;
-          break;
-        case LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ:
-          ranges = oob_packet->payload.data_25hz_30hz.ranges;
-          intensities = oob_packet->payload.data_25hz_30hz.intensities;
-          break;
-      }
-
-      scan_block.block_id = oob_packet->block_num;
-      scan_block.timestamp = oob_packet->timestamp;
       scan_block.layers.resize(1);
-      scan_block.layers[0].ranges.resize(block_length);
-      scan_block.layers[0].intensities.resize(block_length);
-      for (int i = 0; i < block_length; i++) {
-        scan_block.layers[0].ranges[i] = ranges[i];
-        scan_block.layers[0].intensities[i] = intensities[i];
+      scan_block.layers[0].ranges.resize(oob_packet_header->block_length);
+      scan_block.layers[0].intensities.resize(oob_packet_header->block_length);
+      for (int i = 0; i < oob_packet_header->block_length; i++) {
+        if (oob_packet_header->flags.payload_layout.intensity_width == INTENSITY_WIDTH_8BIT) {
+          const uint16_t* ranges = (uint16_t*)(oob_packet_header + 1);
+          const uint8_t* intensities = (uint8_t*)(ranges + oob_packet_header->block_length);
+          scan_block.layers[0].ranges[i] = ranges[i];
+          scan_block.layers[0].intensities[i] = intensities[i];
+        }
+        else if (oob_packet_header->flags.payload_layout.intensity_width == INTENSITY_WIDTH_16BIT) {
+          const uint16_t* ranges = (uint16_t*)(oob_packet_header + 1);
+          const uint16_t* intensities = ranges + oob_packet_header->block_length;
+          scan_block.layers[0].ranges[i] = ranges[i];
+          scan_block.layers[0].intensities[i] = intensities[i];
+        }
       }
     }
   }
@@ -352,6 +362,23 @@ error_t Device::getSubnetMask(in_addr_t& subnet)
 
   if (result == error_t::no_error)
     subnet = htonl(asio::ip::address_v4::from_string(response["result"].GetString()).to_uint());
+
+  return result;
+}
+
+error_t Device::getHostName(std::string& host_name)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "connectivity.network.hostName", allocator), allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  if (result == error_t::no_error)
+    host_name = response["result"].GetString();
 
   return result;
 }
@@ -416,6 +443,22 @@ error_t Device::isOobEnabled(bool& enabled)
 
   error_t result = session_->executeCommand(std::move(request), response);
 
+  if (result == error_t::no_error)
+    enabled = response["result"].GetBool();
+
+  return result;
+}
+
+error_t Device::getOobAutoStartStreaming(bool& enabled)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/get");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "transport.oob.autoStartStreaming", allocator), allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
   if (result == error_t::no_error)
     enabled = response["result"].GetBool();
 
@@ -511,6 +554,23 @@ error_t Device::setSubnetMask(in_addr_t subnet)
   return result;
 }
 
+error_t Device::setHostName(const std::string& host_name)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "connectivity.network.hostName", allocator)
+                      .AddMember("value", rapidjson::Value().SetString(
+                        host_name.c_str(), allocator), allocator),
+                    allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
 error_t Device::setScanFrequency(int frequency)
 {
   rapidjson::Document request = session_->createEmptyRequestObject(), response;
@@ -567,6 +627,22 @@ error_t Device::setOobEnabled(bool enabled)
   request.AddMember("params",
                     rapidjson::Value().SetObject()
                       .AddMember("entry", "transport.oob.enabled", allocator)
+                      .AddMember("value", enabled, allocator),
+                    allocator);
+
+  error_t result = session_->executeCommand(std::move(request), response);
+
+  return result;
+}
+
+error_t Device::setOobAutoStartStreaming(bool enabled)
+{
+  rapidjson::Document request = session_->createEmptyRequestObject(), response;
+  rapidjson::Document::AllocatorType& allocator = request.GetAllocator();
+  request["method"].SetString("settings/set");
+  request.AddMember("params",
+                    rapidjson::Value().SetObject()
+                      .AddMember("entry", "transport.oob.autoStartStreaming", allocator)
                       .AddMember("value", enabled, allocator),
                     allocator);
 

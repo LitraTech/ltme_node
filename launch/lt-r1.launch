@@ -1,0 +1,35 @@
+<launch>
+  <node pkg="ltme_node" type="ltme_node" name="ltme_node" output="screen">
+    <param name="device_model" value="LT-R1"/>
+
+    <!-- IP address of LT-R1 -->
+    <param name="device_address" value="192.168.10.160"/>
+
+    <!-- Frame ID used by the published LaserScan messages -->
+    <!-- <param name="frame_id" value="laser"/> -->
+
+    <!-- If this option is enabled, published LaserScan messages will have their X and Z axes inverted. -->
+    <!-- This is mostly useful when the device is mounted upside down, as it effectively undos the inversion created by the mounting, -->
+    <!-- and makes it look like the scans are from a device installed in a normal, upward direction. -->
+    <!-- <param name="invert_frame" value="false"/> -->
+
+    <!-- Start and end angle of published scans -->
+    <!-- As LT-R1 has an FOV of 270 degrees, the minimum allowed value for angle_min is -2.356 (about -3 * pi / 4), and the maximum allowed value for angle_max is 2.356 (about 3 * pi / 4) -->
+    <!-- <param name="angle_min" value="-1.571"/> -->
+    <!-- <param name="angle_max" value="1.571"/> -->
+
+    <!-- Range of angle for which data should be excluded from published scans -->
+    <!-- Leave these two parameters commented out if a full 270 degree FOV is desired -->
+    <!-- <param name="angle_excluded_min" value="-0.785"/> -->
+    <!-- <param name="angle_excluded_max" value="0.785"/> -->
+
+    <!-- Minimum and maximum range value of published scans -->
+    <!-- Defaults to 0.05 and 30 respectively if not specified -->
+    <!-- <param name="range_min" value="0.05"/> -->
+    <!-- <param name="range_max" value="30"/> -->
+
+    <!-- Adjust how data post-processing stage will filter scan artifacts caused by veiling effect -->
+    <!-- Valid range is between 0 and 100 inclusive, larger value leads to more aggressive filtering -->
+    <!-- <param name="shadow_filter_strength" value="50"/> -->
+  </node>
+</launch>

@@ -8,55 +8,53 @@
 namespace ldcp_sdk
 {
 
+typedef enum {
+  ANGULAR_FOV_270DEG,
+  ANGULAR_FOV_360DEG
+} angular_fov_t;
+
+enum {
+  INTENSITY_WIDTH_8BIT,
+  INTENSITY_WIDTH_16BIT
+};
+
 class ScanBlock
 {
 public:
   class BlockData
   {
   public:
-    std::vector<uint16_t> ranges;
-    std::vector<uint8_t> intensities;
+    std::vector<int> ranges;
+    std::vector<int> intensities;
   };
 
-  uint8_t block_id;
-  uint32_t timestamp;
+  int block_index;
+  int block_count;
+  int block_length;
+  unsigned int timestamp;
+  angular_fov_t angular_fov;
   std::vector<BlockData> layers;
 };
 
-const int LASER_SCAN_BLOCK_LENGTH_10HZ = 288;
-const int LASER_SCAN_BLOCK_LENGTH_15HZ = 192;
-const int LASER_SCAN_BLOCK_LENGTH_20HZ = 144;
-const int LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ = 96;
-
 #pragma pack(push, 1)
-struct OobPacket
+struct OobPacketHeader
 {
   uint16_t signature;
-  uint16_t frame_num;
-  uint8_t block_num;
-  uint8_t flags;
-  uint16_t count;
+  uint16_t frame_index;
+  uint8_t block_index;
+  uint8_t block_count;
+  uint16_t block_length;
   uint32_t timestamp;
   uint16_t checksum;
-  uint16_t reserved;
   union {
     struct {
-      uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_10HZ];
-      uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_10HZ];
-    } data_10hz;
+      uint16_t intensity_width : 1;
+    } payload_layout;
     struct {
-      uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_15HZ];
-      uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_15HZ];
-    } data_15hz;
-    struct {
-      uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_20HZ];
-      uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_20HZ];
-    } data_20hz;
-    struct {
-      uint16_t ranges[LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ];
-      uint8_t intensities[LASER_SCAN_BLOCK_LENGTH_25HZ_30HZ];
-    } data_25hz_30hz;
-  } payload;
+      uint16_t : 8;
+      uint16_t angular_fov : 1;
+    };
+  } flags;
 };
 #pragma pack(pop)
 
@@ -66,11 +64,12 @@ public:
   class FrameData
   {
   public:
-    std::vector<uint16_t> ranges;
-    std::vector<uint8_t> intensities;
+    std::vector<int> ranges;
+    std::vector<int> intensities;
   };
 
-  uint32_t timestamp;
+  unsigned int timestamp;
+  angular_fov_t angular_fov;
   std::vector<FrameData> layers;
 };
 
