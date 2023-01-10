@@ -236,6 +236,23 @@ void LidarDriver::run()
         }
 
         if (device_ready) {
+          double fov_angle_min = 0, fov_angle_max = 0;
+          switch (scan_block.angular_fov) {
+            case ldcp_sdk::ANGULAR_FOV_270DEG:
+              fov_angle_min = -M_PI * 3 / 4;
+              fov_angle_max = M_PI * 3 / 4;
+              break;
+            case ldcp_sdk::ANGULAR_FOV_360DEG:
+              fov_angle_min = -M_PI;
+              fov_angle_max = M_PI;
+              break;
+            default:
+              ROS_ERROR("Unsupported FoV flag %d", scan_block.angular_fov);
+              exit(-1);
+          }
+          angle_min_ = (angle_min_ > fov_angle_min) ? angle_min_ : fov_angle_min;
+          angle_max_ = (angle_max_ < fov_angle_max) ? angle_max_ : fov_angle_max;
+
           int beam_count = scan_block.block_count * scan_block.block_length * 360 /
             ((scan_block.angular_fov == ldcp_sdk::ANGULAR_FOV_270DEG) ? 270 : 360);
           int beam_index_min = std::ceil(angle_min_ * beam_count / (2 * M_PI));
