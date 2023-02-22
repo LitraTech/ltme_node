@@ -34,6 +34,7 @@ public:
   const static int DEFAULT_AVERAGE_FACTOR;
   const static int DEFAULT_SHADOW_FILTER_STRENGTH;
   const static int DEFAULT_RECEIVER_SENSITIVITY_BOOST;
+  const static bool DEFAULT_THROTTLE_FRAMES;
 
 public:
   LidarDriver();
@@ -73,6 +74,7 @@ private:
   int average_factor_;
   int shadow_filter_strength_;
   int receiver_sensitivity_boost_;
+  bool throttle_frames_;
 
   std::unique_ptr<ldcp_sdk::Device> device_;
   std::mutex mutex_;

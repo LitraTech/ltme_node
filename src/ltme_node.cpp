@@ -21,6 +21,7 @@ const double LidarDriver::RANGE_MAX_LIMIT_I2 = 70;
 const int LidarDriver::DEFAULT_AVERAGE_FACTOR = 1;
 const int LidarDriver::DEFAULT_SHADOW_FILTER_STRENGTH = 50;
 const int LidarDriver::DEFAULT_RECEIVER_SENSITIVITY_BOOST = 0;
+const bool LidarDriver::DEFAULT_THROTTLE_FRAMES = false;
 
 LidarDriver::LidarDriver()
   : nh_private_("~")
@@ -64,6 +65,7 @@ LidarDriver::LidarDriver()
   nh_private_.param<int>("average_factor", average_factor_, DEFAULT_AVERAGE_FACTOR);
   nh_private_.param<int>("shadow_filter_strength", shadow_filter_strength_, DEFAULT_SHADOW_FILTER_STRENGTH);
   nh_private_.param<int>("receiver_sensitivity_boost", receiver_sensitivity_boost_, DEFAULT_RECEIVER_SENSITIVITY_BOOST);
+  nh_private_.param<bool>("throttle_frames", throttle_frames_, DEFAULT_THROTTLE_FRAMES);
 
   if (!(enforced_transport_mode_ == "none" || enforced_transport_mode_ == "normal" || enforced_transport_mode_ == "oob")) {
     ROS_ERROR("Transport mode \"%s\" not supported", enforced_transport_mode_.c_str());
@@ -261,7 +263,12 @@ void LidarDriver::run()
             throw std::exception();
         };
 
+        int frame_count = 0;
         while (nh_.ok() && !quit_driver_.load()) {
+          bool drop_current_frame = false;
+          if (throttle_frames_ && (active_scan_frequency_.load() == 30) && (frame_count % 2 == 1))
+            drop_current_frame = true;
+
           ldcp_sdk::ScanBlock scan_block;
           try {
             do {
@@ -307,6 +314,8 @@ void LidarDriver::run()
             std::fill(laser_scan.intensities.begin(), laser_scan.intensities.end(), 0.0);
 
             auto updateLaserScan = [&](const ldcp_sdk::ScanBlock& scan_block) {
+              if (drop_current_frame)
+                return;
               int block_size = scan_block.layers[0].ranges.size();
               for (int i = 0; i < block_size; i++) {
                 int beam_index = (scan_block.block_index - scan_block.block_count / 2) * block_size + i;
@@ -359,7 +368,9 @@ void LidarDriver::run()
               laser_scan.intensities.resize(final_size);
             }
 
-            laser_scan_publisher.publish(laser_scan);
+            if (!drop_current_frame)
+              laser_scan_publisher.publish(laser_scan);
+            frame_count++;
 
             if (hibernation_requested_.load()) {
               device_->stopMeasurement();

@@ -36,5 +36,10 @@
     <!-- Adjust how data post-processing stage will filter scan artifacts caused by veiling effect -->
     <!-- Valid range is between 0 and 100 inclusive, larger value leads to more aggressive filtering -->
     <!-- <param name="shadow_filter_strength" value="50"/> -->
+
+    <!-- If the device is scanning at its highest frequency (30 Hz), -->
+    <!-- setting this paramter to true will cause the driver to drop each alternate frame -->
+    <!-- such that the overall frame rate is limited to 15 Hz. -->
+    <!-- <param name="throttle_frames" value="false"/> -->
   </node>
 </launch>
