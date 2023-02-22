@@ -4,6 +4,7 @@
 #include "ltme_node/QuerySerial.h"
 #include "ltme_node/QueryFirmwareVersion.h"
 #include "ltme_node/QueryHardwareVersion.h"
+#include "ltme_node/SetScanFrequency.h"
 
 #include <ros/ros.h>
 #include <std_srvs/Empty.h>
@@ -45,6 +46,8 @@ private:
                             ltme_node::QueryFirmwareVersionResponse& response);
   bool queryHardwareVersion(ltme_node::QueryHardwareVersionRequest& request,
                             ltme_node::QueryHardwareVersionResponse& response);
+  bool setScanFrequency(ltme_node::SetScanFrequencyRequest& request,
+                        ltme_node::SetScanFrequencyResponse& response);
   bool requestHibernationService(std_srvs::EmptyRequest& request,
                                  std_srvs::EmptyResponse& response);
   bool requestWakeUpService(std_srvs::EmptyRequest& request,
@@ -74,6 +77,7 @@ private:
   std::unique_ptr<ldcp_sdk::Device> device_;
   std::mutex mutex_;
 
+  std::atomic_int active_scan_frequency_;
   std::atomic_bool hibernation_requested_;
   std::atomic_bool quit_driver_;
 };

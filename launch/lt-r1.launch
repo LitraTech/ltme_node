@@ -13,6 +13,11 @@
     <!-- and makes it look like the scans are from a device installed in a normal, upward direction. -->
     <!-- <param name="invert_frame" value="false"/> -->
 
+    <!-- Desired scan frequency (and therefore LaserScan frame rate) in unit of Hz. -->
+    <!-- If this parameter is not specified, the device will scan at a frequency according to on-device configuration data. -->
+    <!-- The node also provides a service to adjust scan frequency dynamically that can be called when the node is already running. -->
+    <!-- <param name="scan_frequency" value="30"/> -->
+
     <!-- Start and end angle of published scans -->
     <!-- As LT-R1 has an FOV of 270 degrees, the minimum allowed value for angle_min is -2.356 (about -3 * pi / 4), and the maximum allowed value for angle_max is 2.356 (about 3 * pi / 4) -->
     <!-- <param name="angle_min" value="-1.571"/> -->

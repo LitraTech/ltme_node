@@ -19,6 +19,7 @@ add_service_files(
     QuerySerial.srv
     QueryFirmwareVersion.srv
     QueryHardwareVersion.srv
+    SetScanFrequency.srv
 )
 
 generate_messages(
