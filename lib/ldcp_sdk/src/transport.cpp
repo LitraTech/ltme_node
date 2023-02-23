@@ -65,46 +65,55 @@ NetworkTransport::NetworkTransport(const NetworkLocation& location)
 
 error_t NetworkTransport::connect(int timeout)
 {
+  error_t result = error_t::no_error;
+
   std::mutex mutex;
-  std::unique_lock<std::mutex> lock(mutex);
-  std::condition_variable cv;
+  {
+    std::condition_variable cv;
 
-  asio::error_code connect_result = asio::error::would_block;
-  primary_socket_.async_connect(device_address_, [&](const asio::error_code& error) {
-    if (error != asio::error::operation_aborted) {
-      {
-        std::lock_guard<std::mutex> lock_guard(mutex);
-        connect_result = error;
+    asio::error_code connect_result = asio::error::would_block;
+    primary_socket_.async_connect(device_address_, [&](const asio::error_code& error) {
+      std::lock_guard<std::mutex> lock_guard(mutex);
+      if (result == error_t::no_error) {
+        if (error != asio::error::operation_aborted) {
+          connect_result = error;
+          cv.notify_one();
+        }
+        if (!error) {
+          asio::async_read_until(primary_socket_, incoming_message_buffer_, "\r\n",
+                                 std::bind(&NetworkTransport::incomingMessageHandler,
+                                           this, std::placeholders::_1, std::placeholders::_2));
+        }
       }
-      cv.notify_one();
+    });
+
+    worker_thread_ = std::thread([&]() {
+      io_service_.run();
+    });
+
+    std::unique_lock<std::mutex> lock(mutex);
+    bool wait_result = cv.wait_for(lock, std::chrono::milliseconds(timeout), [&]() {
+      return (connect_result != asio::error::would_block);
+    });
+
+    if (wait_result && !connect_result)
+      result = error_t::no_error;
+    else {
+      if (!wait_result)
+        result = error_t::timed_out;
+      else if (connect_result == asio::error::connection_refused)
+        result = error_t::connection_refused;
+      else
+        result = error_t::unknown;
     }
+  }
 
-    if (!error)
-      asio::async_read_until(primary_socket_, incoming_message_buffer_, "\r\n",
-                             std::bind(&NetworkTransport::incomingMessageHandler,
-                                       this, std::placeholders::_1, std::placeholders::_2));
-  });
-
-  worker_thread_ = std::thread([&]() {
-    io_service_.run();
-  });
-
-  bool wait_result = cv.wait_for(lock, std::chrono::milliseconds(timeout), [&]() {
-    return (connect_result != asio::error::would_block);
-  });
-  if (wait_result && !connect_result)
-    return error_t::no_error;
-  else {
+  if (result != error_t::no_error) {
     primary_socket_.close();
     worker_thread_.join();
-
-    if (!wait_result)
-      return error_t::timed_out;
-    else if (connect_result == asio::error::connection_refused)
-      return error_t::connection_refused;
-    else
-      return error_t::unknown;
   }
+
+  return result;
 }
 
 void NetworkTransport::disconnect()
