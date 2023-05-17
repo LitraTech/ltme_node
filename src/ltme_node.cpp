@@ -217,147 +217,131 @@ void LidarDriver::run()
         device_->startMeasurement();
         device_->startStreaming();
 
+        sensor_msgs::LaserScan laser_scan;
+        laser_scan.header.frame_id = frame_id_;
+        laser_scan.range_min = range_min_;
+        laser_scan.range_max = range_max_;
+
         auto readScanBlock = [&](ldcp_sdk::ScanBlock& scan_block) {
           if (device_->readScanBlock(scan_block) != ldcp_sdk::no_error)
             throw std::exception();
         };
 
-        ldcp_sdk::ScanBlock scan_block;
-
-        bool device_ready = false;
-        for (int i = 0; i < 5 && !device_ready; i++) {
+        while (nh_.ok() && !quit_driver_.load()) {
+          ldcp_sdk::ScanBlock scan_block;
           try {
-            readScanBlock(scan_block);
-            device_ready = true;
-          }
-          catch (...) {
-            ROS_INFO("Waiting for device to become ready...");
-          }
-        }
+            do {
+              readScanBlock(scan_block);
+            } while (scan_block.block_index != 0);
 
-        if (device_ready) {
-          double fov_angle_min = 0, fov_angle_max = 0;
-          switch (scan_block.angular_fov) {
-            case ldcp_sdk::ANGULAR_FOV_270DEG:
-              fov_angle_min = -M_PI * 3 / 4;
-              fov_angle_max = M_PI * 3 / 4;
-              break;
-            case ldcp_sdk::ANGULAR_FOV_360DEG:
-              fov_angle_min = -M_PI;
-              fov_angle_max = M_PI;
-              break;
-            default:
-              ROS_ERROR("Unsupported FoV flag %d", scan_block.angular_fov);
-              exit(-1);
-          }
-          angle_min_ = (angle_min_ > fov_angle_min) ? angle_min_ : fov_angle_min;
-          angle_max_ = (angle_max_ < fov_angle_max) ? angle_max_ : fov_angle_max;
-
-          int beam_count = scan_block.block_count * scan_block.block_length * 360 /
-            ((scan_block.angular_fov == ldcp_sdk::ANGULAR_FOV_270DEG) ? 270 : 360);
-          int beam_index_min = std::ceil(angle_min_ * beam_count / (2 * M_PI));
-          int beam_index_max = std::floor(angle_max_ * beam_count / (2 * M_PI));
-          int beam_index_excluded_min = std::ceil(angle_excluded_min_ * beam_count / (2 * M_PI));
-          int beam_index_excluded_max = std::floor(angle_excluded_max_ * beam_count / (2 * M_PI));
-
-          sensor_msgs::LaserScan laser_scan;
-          laser_scan.header.frame_id = frame_id_;
-          laser_scan.angle_min = (!invert_frame_) ? angle_min_ : angle_max_;
-          laser_scan.angle_max = (!invert_frame_) ? angle_max_ : angle_min_;
-          laser_scan.angle_increment = ((!invert_frame_) ? 1 : -1) *
-              2 * M_PI / beam_count * average_factor_;
-          laser_scan.time_increment = 1.0 / scan_frequency / beam_count * average_factor_;
-          laser_scan.scan_time = 1.0 / scan_frequency;
-          laser_scan.range_min = range_min_;
-          laser_scan.range_max = range_max_;
-
-          auto updateLaserScan = [&](const ldcp_sdk::ScanBlock& scan_block) {
-            int block_size = scan_block.layers[0].ranges.size();
-            for (int i = 0; i < block_size; i++) {
-              int beam_index = (scan_block.block_index - scan_block.block_count / 2) * block_size + i;
-              if (beam_index < beam_index_min || beam_index > beam_index_max)
-                continue;
-              if (beam_index >= beam_index_excluded_min && beam_index <= beam_index_excluded_max)
-                continue;
-              if (scan_block.layers[0].ranges[i] != 0) {
-                laser_scan.ranges[beam_index - beam_index_min] = scan_block.layers[0].ranges[i] * 0.002;
-                laser_scan.intensities[beam_index - beam_index_min] = scan_block.layers[0].intensities[i];
-              }
-              else {
-                laser_scan.ranges[beam_index - beam_index_min] = std::numeric_limits<float>::infinity();
-                laser_scan.intensities[beam_index - beam_index_min] = 0;
-              }
+            double fov_angle_min = 0, fov_angle_max = 0;
+            switch (scan_block.angular_fov) {
+              case ldcp_sdk::ANGULAR_FOV_270DEG:
+                fov_angle_min = -M_PI * 3 / 4;
+                fov_angle_max = M_PI * 3 / 4;
+                break;
+              case ldcp_sdk::ANGULAR_FOV_360DEG:
+                fov_angle_min = -M_PI;
+                fov_angle_max = M_PI;
+                break;
+              default:
+                ROS_ERROR("Unsupported FoV flag %d", scan_block.angular_fov);
+                exit(-1);
             }
-          };
+            angle_min_ = (angle_min_ > fov_angle_min) ? angle_min_ : fov_angle_min;
+            angle_max_ = (angle_max_ < fov_angle_max) ? angle_max_ : fov_angle_max;
 
-          while (nh_.ok() && !quit_driver_.load()) {
+            int beam_count = scan_block.block_count * scan_block.block_length * 360 /
+              ((scan_block.angular_fov == ldcp_sdk::ANGULAR_FOV_270DEG) ? 270 : 360);
+            int beam_index_min = std::ceil(angle_min_ * beam_count / (2 * M_PI));
+            int beam_index_max = std::floor(angle_max_ * beam_count / (2 * M_PI));
+            int beam_index_excluded_min = std::ceil(angle_excluded_min_ * beam_count / (2 * M_PI));
+            int beam_index_excluded_max = std::floor(angle_excluded_max_ * beam_count / (2 * M_PI));
+
+            laser_scan.header.stamp = ros::Time::now();
+            laser_scan.angle_min = (!invert_frame_) ? angle_min_ : angle_max_;
+            laser_scan.angle_max = (!invert_frame_) ? angle_max_ : angle_min_;
+            laser_scan.angle_increment = ((!invert_frame_) ? 1 : -1) *
+                2 * M_PI / beam_count * average_factor_;
+            laser_scan.time_increment = 1.0 / scan_frequency / beam_count * average_factor_;
+            laser_scan.scan_time = 1.0 / scan_frequency;
+
             laser_scan.ranges.resize(beam_index_max - beam_index_min + 1);
             laser_scan.intensities.resize(beam_index_max - beam_index_min + 1);
 
             std::fill(laser_scan.ranges.begin(), laser_scan.ranges.end(), 0.0);
             std::fill(laser_scan.intensities.begin(), laser_scan.intensities.end(), 0.0);
 
-            try {
-              do {
-                readScanBlock(scan_block);
-              } while (scan_block.block_index != 0);
-
-              laser_scan.header.stamp = ros::Time::now();
-
-              while (scan_block.block_index != scan_block.block_count - 1) {
-                updateLaserScan(scan_block);
-                readScanBlock(scan_block);
+            auto updateLaserScan = [&](const ldcp_sdk::ScanBlock& scan_block) {
+              int block_size = scan_block.layers[0].ranges.size();
+              for (int i = 0; i < block_size; i++) {
+                int beam_index = (scan_block.block_index - scan_block.block_count / 2) * block_size + i;
+                if (beam_index < beam_index_min || beam_index > beam_index_max)
+                  continue;
+                if (beam_index >= beam_index_excluded_min && beam_index <= beam_index_excluded_max)
+                  continue;
+                if (scan_block.layers[0].ranges[i] != 0) {
+                  laser_scan.ranges[beam_index - beam_index_min] = scan_block.layers[0].ranges[i] * 0.002;
+                  laser_scan.intensities[beam_index - beam_index_min] = scan_block.layers[0].intensities[i];
+                }
+                else {
+                  laser_scan.ranges[beam_index - beam_index_min] = std::numeric_limits<float>::infinity();
+                  laser_scan.intensities[beam_index - beam_index_min] = 0;
+                }
               }
+            };
+
+            while (scan_block.block_index != scan_block.block_count - 1) {
               updateLaserScan(scan_block);
+              readScanBlock(scan_block);
+            }
+            updateLaserScan(scan_block);
 
-              if (average_factor_ != 1) {
-                int final_size = laser_scan.ranges.size() / average_factor_;
-                for (int i = 0; i < final_size; i++) {
-                  double ranges_total = 0, intensities_total = 0;
-                  int count = 0;
-                  for (int j = 0; j < average_factor_; j++) {
-                    int index = i * average_factor_ + j;
-                    if (laser_scan.ranges[index] != 0) {
-                      ranges_total += laser_scan.ranges[index];
-                      intensities_total += laser_scan.intensities[index];
-                      count++;
-                    }
-                  }
-
-                  if (count > 0) {
-                    laser_scan.ranges[i] = ranges_total / count;
-                    laser_scan.intensities[i] = (int)(intensities_total / count);
-                  }
-                  else {
-                    laser_scan.ranges[i] = 0;
-                    laser_scan.intensities[i] = 0;
+            if (average_factor_ != 1) {
+              int final_size = laser_scan.ranges.size() / average_factor_;
+              for (int i = 0; i < final_size; i++) {
+                double ranges_total = 0, intensities_total = 0;
+                int count = 0;
+                for (int j = 0; j < average_factor_; j++) {
+                  int index = i * average_factor_ + j;
+                  if (laser_scan.ranges[index] != 0) {
+                    ranges_total += laser_scan.ranges[index];
+                    intensities_total += laser_scan.intensities[index];
+                    count++;
                   }
                 }
 
-                laser_scan.ranges.resize(final_size);
-                laser_scan.intensities.resize(final_size);
+                if (count > 0) {
+                  laser_scan.ranges[i] = ranges_total / count;
+                  laser_scan.intensities[i] = (int)(intensities_total / count);
+                }
+                else {
+                  laser_scan.ranges[i] = 0;
+                  laser_scan.intensities[i] = 0;
+                }
               }
 
-              laser_scan_publisher.publish(laser_scan);
-
-              if (hibernation_requested_.load()) {
-                device_->stopMeasurement();
-                ROS_INFO("Device brought into hibernation");
-                ros::Rate loop_rate(10);
-                while (hibernation_requested_.load())
-                  loop_rate.sleep();
-                device_->startMeasurement();
-                ROS_INFO("Woken up from hibernation");
-              }
+              laser_scan.ranges.resize(final_size);
+              laser_scan.intensities.resize(final_size);
             }
-            catch (const std::exception&) {
-              ROS_WARN("Error reading data from device");
-              break;
+
+            laser_scan_publisher.publish(laser_scan);
+
+            if (hibernation_requested_.load()) {
+              device_->stopMeasurement();
+              ROS_INFO("Device brought into hibernation");
+              ros::Rate loop_rate(10);
+              while (hibernation_requested_.load())
+                loop_rate.sleep();
+              device_->startMeasurement();
+              ROS_INFO("Woken up from hibernation");
             }
           }
+          catch (const std::exception&) {
+            ROS_WARN("Error reading data from device");
+            break;
+          }
         }
-        else
-          ROS_INFO("Device is not ready. Will close connection and retry");
 
         device_->stopStreaming();
       }
