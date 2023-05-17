@@ -120,10 +120,11 @@ void NetworkTransport::disconnect()
 {
   if (primary_socket_.is_open()) {
     io_service_.dispatch([&]() {
-      primary_socket_.shutdown(asio::ip::tcp::socket::shutdown_both);
-      primary_socket_.close();
+      asio::error_code error_code;
+      primary_socket_.shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
+      primary_socket_.close(error_code);
       if (oob_socket_.is_open())
-        oob_socket_.close();
+        oob_socket_.close(error_code);
     });
     worker_thread_.join();
   }
