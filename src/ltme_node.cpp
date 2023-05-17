@@ -227,11 +227,15 @@ void LidarDriver::run()
             throw std::exception();
         };
 
+        ros::Time last_frame_end_timestamp;
+        ros::Time frame_start_timestamp, frame_end_timestamp;
+
         while (nh_.ok() && !quit_driver_.load()) {
           ldcp_sdk::ScanBlock scan_block;
           try {
             do {
               readScanBlock(scan_block);
+              frame_start_timestamp = ros::Time::now();
             } while (scan_block.block_index != 0);
 
             double fov_angle_min = 0, fov_angle_max = 0;
@@ -258,13 +262,10 @@ void LidarDriver::run()
             int beam_index_excluded_min = std::ceil(angle_excluded_min_ * beam_count / (2 * M_PI));
             int beam_index_excluded_max = std::floor(angle_excluded_max_ * beam_count / (2 * M_PI));
 
-            laser_scan.header.stamp = ros::Time::now();
             laser_scan.angle_min = (!invert_frame_) ? angle_min_ : angle_max_;
             laser_scan.angle_max = (!invert_frame_) ? angle_max_ : angle_min_;
             laser_scan.angle_increment = ((!invert_frame_) ? 1 : -1) *
                 2 * M_PI / beam_count * average_factor_;
-            laser_scan.time_increment = 1.0 / scan_frequency / beam_count * average_factor_;
-            laser_scan.scan_time = 1.0 / scan_frequency;
 
             laser_scan.ranges.resize(beam_index_max - beam_index_min + 1);
             laser_scan.intensities.resize(beam_index_max - beam_index_min + 1);
@@ -294,6 +295,7 @@ void LidarDriver::run()
             while (scan_block.block_index != scan_block.block_count - 1) {
               updateLaserScan(scan_block);
               readScanBlock(scan_block);
+              frame_end_timestamp = ros::Time::now();
             }
             updateLaserScan(scan_block);
 
@@ -325,7 +327,21 @@ void LidarDriver::run()
               laser_scan.intensities.resize(final_size);
             }
 
-            laser_scan_publisher.publish(laser_scan);
+            ros::Duration block_duration = ros::Duration(
+              (frame_end_timestamp - frame_start_timestamp).toSec() /
+              (scan_block.block_count - 1));
+            frame_start_timestamp -= block_duration;
+
+            if (last_frame_end_timestamp.isValid()) {
+              if (frame_start_timestamp < last_frame_end_timestamp)
+                frame_start_timestamp = last_frame_end_timestamp;
+              laser_scan.header.stamp = frame_start_timestamp;
+              laser_scan.time_increment = (frame_end_timestamp - frame_start_timestamp).toSec() /
+                (scan_block.block_count * scan_block.block_length) * average_factor_;
+              laser_scan.scan_time = (frame_end_timestamp - frame_start_timestamp).toSec();
+              laser_scan_publisher.publish(laser_scan);
+            }
+            last_frame_end_timestamp = frame_end_timestamp;
 
             if (hibernation_requested_.load()) {
               device_->stopMeasurement();
