@@ -112,6 +112,8 @@ void LidarDriver::run()
   std::unique_lock<std::mutex> lock(mutex_);
 
   ros::Publisher laser_scan_publisher = nh_.advertise<sensor_msgs::LaserScan>("scan", 16);
+  ros::ServiceServer query_model_service = nh_private_.advertiseService<ltme_node::QueryModelRequest, ltme_node::QueryModelResponse>
+    ("query_model", std::bind(&LidarDriver::queryModelService, this, std::placeholders::_1, std::placeholders::_2));
   ros::ServiceServer query_serial_service = nh_private_.advertiseService<ltme_node::QuerySerialRequest, ltme_node::QuerySerialResponse>
     ("query_serial", std::bind(&LidarDriver::querySerialService, this, std::placeholders::_1, std::placeholders::_2));
   ros::ServiceServer query_firmware_service = nh_private_.advertiseService<ltme_node::QueryFirmwareVersionRequest, ltme_node::QueryFirmwareVersionResponse>
@@ -377,6 +379,19 @@ void LidarDriver::run()
       loop_rate.sleep();
     }
   }
+}
+
+bool LidarDriver::queryModelService(ltme_node::QueryModelRequest& request, ltme_node::QueryModelResponse& response)
+{
+  std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+  if (lock.owns_lock()) {
+    std::string model;
+    if (device_->queryModel(model) == ldcp_sdk::no_error) {
+      response.model = model;
+      return true;
+    }
+  }
+  return false;
 }
 
 bool LidarDriver::querySerialService(ltme_node::QuerySerialRequest& request,

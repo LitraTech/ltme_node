@@ -1,6 +1,7 @@
 #ifndef LTME_NODE_H
 #define LTME_NODE_H
 
+#include "ltme_node/QueryModel.h"
 #include "ltme_node/QuerySerial.h"
 #include "ltme_node/QueryFirmwareVersion.h"
 #include "ltme_node/QueryHardwareVersion.h"
@@ -39,6 +40,8 @@ public:
   void run();
 
 private:
+  bool queryModelService(ltme_node::QueryModelRequest& request,
+                         ltme_node::QueryModelResponse& response);
   bool querySerialService(ltme_node::QuerySerialRequest& request,
                           ltme_node::QuerySerialResponse& response);
   bool queryFirmwareVersion(ltme_node::QueryFirmwareVersionRequest& request,

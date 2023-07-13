@@ -16,6 +16,7 @@ find_package(OpenSSL)
 add_service_files(
   DIRECTORY srv
   FILES
+    QueryModel.srv
     QuerySerial.srv
     QueryFirmwareVersion.srv
     QueryHardwareVersion.srv
